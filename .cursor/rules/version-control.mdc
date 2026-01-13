@@ -1,0 +1,109 @@
+---
+alwaysApply: true
+description: Version Bump Control: Workspace-Aware
+---
+
+# Version & Changelog Rules
+
+## 1. 版本号基本约束（SemVer）
+
+- 项目统一使用语义化版本号：`MAJOR.MINOR.PATCH`；
+- 除非我在对话里**明确说明要发大版本 / 次版本**，否则：
+  - MAJOR 不允许自动改动；
+  - MINOR 不允许自动改动；
+  - 任何版本更新**一律只允许自增 PATCH（修正版本号）**；
+- 示例：当前为 `0.3.5` 时，允许自动改为 `0.3.6`，**不允许**改为 `0.4.0` 或 `1.0.0`，除非我另行说明；
+
+## 2. 版本号与包内版本保持一致
+
+当 Cursor 修改代码时，必须保证各处版本号一致，尤其是：
+
+- 包内版本定义（示例，按项目类型自动识别）：
+  - Python：`pyproject.toml` / `setup.cfg` / `setup.py` / `__init__.py` 中的 `__version__`；
+  - Node：`package.json` 中的 `version`；
+  - 其他语言：遵循项目里已有的版本字段；
+- `CHANGELOG` / `CHANGELOG.md` / `docs/CHANGELOG.md` 中最近一条版本记录的版本号
+- 规则：  
+  - 当需要更新版本时，**先读取现有版本号**，再在此基础上 PATCH+1；
+  - 更新后，**包内版本字段与 changelog 中最新版本号必须完全一致**（字符串完全相同）；
+
+## 3. 何时必须自增 PATCH（修正版本号）
+
+- 只要满足以下任一条件，就视为“需要版本更新”，必须执行 PATCH+1：
+  - 修改了**业务代码 / 核心逻辑**（非纯注释、非格式化）；
+  - 修改了**对外行为**（返回值、API、配置解释方式等），即便是小改动；
+  - 修改了**打包配置、依赖版本**，会影响构建结果；
+- 以下情况**可以不改版本号**（由我决定是否改）：
+  - 只修改测试代码（`tests/`、`*_test.py` 等）；
+  - 只修改文档（`*.md`、`docs/`）；
+  - 只做格式化 / 排版调整（不改变语义）；
+- 当你判断“是否需要 bump 版本”时，遵循：  
+  - **宁可多自增 PATCH，也不要少自增**；如果不确定，就建议自增 PATCH，并在改动说明中标记原因；
+
+## 4. 更新版本时的具体行为
+
+当 Cursor 进行一次需要版本更新的修改时，应遵循以下步骤：
+
+1. **读取当前版本号**：
+   - 从包内版本字段中读取（如 `__version__` 或 `package.json` 的 `version`）；
+2. **计算新版本号**：
+   - 只修改 PATCH：`MAJOR.MINOR.(PATCH+1)`；
+3. **统一写回**：
+   - 在所有定义版本的文件中写入相同的新版本号；
+   - 确保 changelog 中最新记录的版本号与包内版本号完全一致；
+4. **CHANGELOG 记录**：
+   - 如果 changelog 已存在当前版本标题：
+     - 在对应版本下追加本次修改条目，而**不创建新版本号**；
+   - 如果 changelog 没有当前新版本：
+     - 创建形如 `## vX.Y.Z - YYYY-MM-DD` 的新条目；
+     - 在其下用列表简要说明本次变更（至少 1 条），例如：
+       - `- Fix: xxx`
+       - `- Refactor: yyy`
+5. 若由于上下文不完整无法确定版本号位置或格式：
+   - 不要随意猜测写入；
+   - 在生成说明中**明确指出“需要手工对齐版本号和 changelog”**，并给出推荐的新版本号字符串；
+
+## 5. 与我交互时的说明习惯
+
+- 当你因为一次修改而自增了 PATCH 时：
+  - 在最终回答中用一行简要说明，例如：
+    - `Version bump: 0.3.5 → 0.3.6 (patch only, keep MAJOR.MINOR unchanged)`
+- 如果你认为应该更新 MINOR 或 MAJOR：
+  - **不要直接改**，而是先在回答中说明理由，并提示我确认：
+    - `当前改动影响到对外 API，建议从 0.3.6 升级为 0.4.0，请确认后再执行`
+
+
+## 6. 工作区变更控制（非常重要）
+
+# 核心原则：只有在“工作区原本干净 → 本次修改导致变脏”时，才允许自增 PATCH。
+# 如果工作区本来已经有修改（dirty），Cursor 不得因为继续编辑而重复升级版本。
+
+# 规则描述：
+# 1. Cursor 必须在执行版本号 bump 之前判断工作区状态：
+#    - 若 workspace 是 clean（无未提交修改），且本次操作修改了业务代码 → 允许 PATCH+1；
+#    - 若 workspace 已经是 dirty → 禁止重复 bump，同一轮开发只允许 bump 一次；
+# 2. 在单次编辑 Session 内，如果已经 bump 过版本号 → 禁止再次 bump，直到用户完整完成一次 commit。
+
+versionBump:
+  workspace:
+    requireCleanBeforeChange: true      # 需要干净 → 修改 才能 bump
+    forbidBumpIfAlreadyDirty: true      # 工作区脏时禁止 bump
+    bumpOncePerSession: true            # 一个编辑 session 内最多 bump 一次
+
+## 7. 版本号更新的判定逻辑
+
+# Cursor 判断是否需要 bump PATCH 时必须按以下优先级执行：
+
+# Step 1. 判断是否修改了业务代码
+versionBump.changeTypesRequiringPatch:
+  - source_code        # *.py, *.ts, *.js, *.go, *.java, 等业务源文件
+  - configs_affecting_build  # 如 pyproject, package.json 等
+  - public_api_changes
+
+# 以下修改 **不触发版本号 bump**（由用户手工控制）
+versionBump.changeTypesNotRequiringPatch:
+  - documentation      # *.md
+  - tests              # tests/*
+  - formattingOnly     # 代码格式化、黑化、排序
+  - commentsOnly       # 只改注释
+  - samplesOrExamples

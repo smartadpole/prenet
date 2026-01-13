@@ -3,19 +3,21 @@ import PIL
 from PIL import Image
 import torch.utils.data as data
 from torchvision import datasets, transforms
+import os
 
 def My_loader(path):
     return PIL.Image.open(path).convert('RGB')
 
 class MyDataset(torch.utils.data.Dataset):
 
-    def __init__(self, txt_dir, image_path, transform=None, target_transform=None, loader=My_loader):
+    def __init__(self, txt_dir, image_path, transform=None, target_transform=None, loader=My_loader, use_absolute_path=False):
         data_txt = open(txt_dir, 'r')
         imgs = []
         for line in data_txt:
             line = line.strip()
-            words = line.split(' ')
+            words = line.split(',') if ',' in line else line.split(' ')
             imgs.append((words[0], int(words[1].strip())))
+
         self.imgs = imgs
         self.transform = transform
         self.target_transform = target_transform
@@ -28,24 +30,15 @@ class MyDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         img_name, label = self.imgs[index]
-        # label = list(map(int, label))
-        # print label
-        # print type(label)
-        #img = self.loader('/home/vipl/llh/food101_finetuning/food101_vgg/origal_data/images/'+img_name.replace("\\","/"))
-        img = self.loader(self.image_path + img_name)
+        img = self.loader(os.path.join(self.image_path, img_name))
 
-        # print img
         if self.transform is not None:
             img = self.transform(img)
-            # print img.size()
-            # label =torch.Tensor(label)
-
-            # print label.size()
         return img, label
         # if the label is the single-label it can be the int
         # if the multilabel can be the list to torch.tensor
 
-def load_data(image_path, train_dir, test_dir, batch_size):
+def load_data(image_path, train_dir="", test_dir="", batch_size=1):
     normalize = transforms.Normalize(mean=[0.5457954, 0.44430383, 0.34424934],
                                      std=[0.23273608, 0.24383051, 0.24237761])
     train_transforms = transforms.Compose([
@@ -65,8 +58,21 @@ def load_data(image_path, train_dir, test_dir, batch_size):
         transforms.ToTensor(),
         normalize
     ])
-    train_dataset = MyDataset(txt_dir=train_dir, image_path=image_path, transform=train_transforms)
-    test_dataset = MyDataset(txt_dir=test_dir, image_path=image_path, transform=test_transforms)
+    
+    # Check if train_dir/test_dir are directories and look for train.txt/val.txt
+    use_absolute_path = False
+    actual_train_dir = train_dir
+    actual_test_dir = test_dir
+
+    train_txt = os.path.join(image_path, 'train.txt')
+    val_txt = os.path.join(image_path, 'val.txt')
+    if os.path.isfile(train_txt) and os.path.isfile(val_txt):
+        actual_train_dir = train_txt
+        actual_test_dir = val_txt
+        use_absolute_path = True
+    
+    train_dataset = MyDataset(txt_dir=actual_train_dir, image_path=image_path, transform=train_transforms, use_absolute_path=use_absolute_path)
+    test_dataset = MyDataset(txt_dir=actual_test_dir, image_path=image_path, transform=test_transforms, use_absolute_path=use_absolute_path)
     train_loader  = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True,  num_workers=0)
     test_loader   = torch.utils.data.DataLoader(dataset=test_dataset,  batch_size=batch_size//2,  shuffle=False, num_workers=0)
     return train_dataset, train_loader, test_dataset, test_loader

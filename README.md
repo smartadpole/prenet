@@ -1,7 +1,8 @@
-
 # Progressive Region Enhancement Network (PRENet)
- 
+
 Code release for Large Scale Visual Food Recognition
+
+**Version:** 0.1.0
 
 ### Introduction
 ![method](Method.png)
@@ -39,15 +40,48 @@ dataset
 |      └── ...
 │── ...
 ```
-2. Download the training and testing list files, e.g. train_full.txt, test_full.txt 
+
+2. Prepare the training and testing list files. You have two options:
+
+   **Option A:** Place `train.txt` and `val.txt` in the dataset root directory. The data loader will automatically discover them.
+   
+   **Option B:** Provide explicit paths using `--train_path` and `--test_path` arguments.
+
+   The list files should contain one entry per line, with format:
+   - Space-separated: `image_path label`
+   - Comma-separated: `image_path,label`
+   
+   Example:
+   ```
+   class_001/1.jpg 0
+   class_001/2.jpg 0
+   class_002/1.jpg 1
+   ``` 
 
 
 ### Training
 
 1. To train a `PRENet` on food datasets from scratch, run:
-```python
-python main.py --dataset <food_dataset> --image_path <data_path> --train_path <train_path> --test_path <test_path> --weight_path <pretrained_model>
-```
+
+   **If using automatic file discovery (train.txt/val.txt in dataset root):**
+   ```bash
+   python main.py --dataset <food_dataset> --image_path <data_path> --weight_path <pretrained_model>
+   ```
+
+   **If using explicit paths:**
+   ```bash
+   python main.py --dataset <food_dataset> --image_path <data_path> --train_path <train_path> --test_path <test_path> --weight_path <pretrained_model>
+   ```
+
+   **Parameters:**
+   - `--dataset`: Dataset type (`food2k`, `food101`, `food500`, or `other`). Default: `other`
+   - `--image_path`: (Required) Path to dataset root directory
+   - `--train_path`: (Optional) Path to training list file. If not provided, will look for `train.txt` in `image_path`
+   - `--test_path`: (Optional) Path to testing list file. If not provided, will look for `val.txt` in `image_path`
+   - `--weight_path`: (Required) Path to pretrained model weights
+   - `--batchsize`: Batch size (default: 2)
+   - `--learning_rate`: Initial learning rate (default: 1e-4)
+   - `--epoch`: Number of training epochs (default: 200)
 
 ### Inference
 
@@ -55,9 +89,15 @@ python main.py --dataset <food_dataset> --image_path <data_path> --train_path <t
 
 2. To evaluate a pre-trained `PRENet` on food datasets, run:
 
-```
-python main.py --dataset <food_dataset> --image_path <data_path> --train_path <train_path> --test_path <test_path> --weight_path <pretrained_model> --test --use_checkpoint --checkpoint <checkpoint_path>
-```
+   **If using automatic file discovery:**
+   ```bash
+   python main.py --dataset <food_dataset> --image_path <data_path> --weight_path <pretrained_model> --test --use_checkpoint --checkpoint <checkpoint_path>
+   ```
+
+   **If using explicit paths:**
+   ```bash
+   python main.py --dataset <food_dataset> --image_path <data_path> --train_path <train_path> --test_path <test_path> --weight_path <pretrained_model> --test --use_checkpoint --checkpoint <checkpoint_path>
+   ```
 
 ### Other pretrained model on Food2K
 

@@ -1,0 +1,62 @@
+---
+description: Core project rules; enforce English-only comments and docstrings;
+alwaysApply: true
+globs:
+  - "**/*.py"
+---
+
+
+# Project Code Style Rules
+
+## 1. Comment Rules (Very Strict)
+- Source code files MUST NOT contain any Chinese characters in comments;
+- All comments MUST use English only;
+- If the user request contains Chinese explanation, Cursor must auto-translate comment content into English before inserting into code;
+- If translation is ambiguous, Cursor should generate a clear English explanation instead of outputting Chinese;
+
+## 2. Allowed Chinese Content
+Chinese characters are ONLY allowed in:
+- Log messages (e.g., logger.info("开始执行任务"));
+- Business text returned to frontend or API;
+- User-facing error messages;
+- Documentation (*.md files) outside of source code;
+- Test data strings;
+
+## 3. Disallowed Chinese Content
+Chinese MUST NOT appear in:
+- Code comments (#, //, /* */);
+- Variable names, function names, class names;
+- Inline type documentation in code;
+- Docstrings used for code documentation (Python triple quotes) — must be English;
+
+## 4. Auto Correction Behavior
+When Cursor generates or edits code:
+1. Automatically convert comment content to English;
+2. If Chinese appears in a code comment → remove or rewrite in English;
+3. If Chinese appears in log text → keep it unchanged;
+4. If Chinese appears in variable/function/class names → auto-convert to meaningful English identifiers;
+
+## 5. Summary
+- Comments: **English only**;
+- Logs: **Chinese allowed**;
+- Identifiers: **English only**;
+- Docs: **Chinese allowed**;
+
+## 6. Changelog Language Rules
+changelog:
+  language: chinese-preferred   # changelog 内容默认使用中文书写
+
+  # CHANGELOG 的正文语言要求：
+  rules:
+    - description: "CHANGELOG 每条记录的叙述、说明、变更描述均使用中文"
+    - description: "CHANGELOG 中允许出现英文文件名、目录名、模块名、函数名、API 名、参数名等技术标识符"
+    - description: "允许出现英文代码关键字，例如 class, function, import，但不可出现大段英文叙述"
+    - description: "若内容涉及目录结构、路径、版本号等，保持英文原样，不需要翻译"
+    - description: "若 Cursor 自动生成 CHANGELOG，必须严格以中文撰写说明性内容"
+
+  # 示例（Cursor 可参照这类写法自动生成）
+  examples:
+    - "- 修复：`analysis/parser.py` 中正则表达式匹配异常的问题"
+    - "- 优化：重构 `prompt_builder`，减少重复代码"
+    - "- 调整：目录 `evaluation/` 下的结构更清晰，拆分 metric 模块"
+    - "- 新增：支持从 `pyproject.toml` 自动读取版本号"

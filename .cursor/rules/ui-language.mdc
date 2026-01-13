@@ -1,0 +1,46 @@
+---
+alwaysApply: true
+---
+# 跨平台/跨框架 i18n & 双语强制规范
+
+## 1. 核心目标
+- 彻底杜绝代码中出现硬编码的中/英文字符串（面向用户部分）。
+- 确保所有 UI 文本均通过翻译函数/宏进行包装。
+- 保证中英文资源文件（JSON/PO/YAML）的 KV 对 100% 同步。
+
+## 2. 框架适配规则 (Framework Agnostic Patterns)
+
+### A. Python UI (PySide, PyQt, Streamlit, Flet, Custom)
+- **禁止**: `label.text = "提交"` 或 `st.write("Welcome")`
+- **强制**: 使用翻译函数，如 `label.text = _("submit")` 或 `st.write(t("welcome"))`。
+
+### B. Web 模板 (Jinja2, Django Template, HTML)
+- **禁止**: `<button>保存</button>`
+- **强制**: 使用模板标签，如 `<button>{{ _('save') }}</button>` 或 `{% trans "save" %}`。
+
+### C. 前端框架 (React, Vue, Alpine.js)
+- **禁止**: `<span>Name:</span>` 或 `placeholder="Enter password"`
+- **强制**: 
+  - JSX: `<span>{t('name')}:</span>`
+  - Vue: `<span>{{ $t('name') }}</span>`
+  - Attributes: `:placeholder="t('enter_password')"`
+
+## 3. 翻译管理流 (Translation Workflow)
+1. **识别与提取**: 
+   - 发现硬编码文本 -> 自动生成语义化 Key (如 `error_timeout`) -> 用 `_()` 或 `t()` 替换原文本。
+2. **多语言更新**:
+   - 自动检测项目中的语言库目录（如 `locales/`, `translations/`, `i18n/`）。
+   - **同步写入**: 在修改代码的同时，必须在 `zh` 和 `en` 文件中同步添加对应的 Key-Value。
+3. **命名规范**:
+   - Key 统一使用 `snake_case` 或 `dot.notation`。
+   - 禁止使用数字命名（如 `text_1`），必须反映业务含义。
+
+## 4. 自动化指令 (For Cursor AI)
+- **代码审查**: 在生成或修改 UI 代码时，如果看到引号内包含中文字符或非变量的英文短语，立即重构为 i18n 形式。
+- **缺失提醒**: 如果我添加了一个 Key 但忘记定义翻译，请主动询问：“我需要为您在 zh 和 en 文件中补充这个词条吗？”
+- **上下文推断**: 根据周围代码判断应使用哪种翻译函数（如在 Flask 里用 `gettext`，在 Vue 里用 `$t`）。
+
+## 5. 排除项
+- 代码内部逻辑标识符（变量名、枚举常量）。
+- 后端非用户可见的 Log 日志。
+- 纯技术参数（API URL、颜色代码、CSS 类名）。

@@ -1,0 +1,139 @@
+---
+alwaysApply: true
+---
+# ===========================
+#  Changelog Auto-Writer Rule
+# ===========================
+
+# Ⅰ. Versioning Rules
+- Project uses SemVer: MAJOR.MINOR.PATCH.
+- PATCH increments automatically only when the workspace changes from clean → dirty.
+- If the workspace is already dirty, do NOT increment PATCH again.
+- MINOR and MAJOR are changed only when explicitly requested by the user.
+
+# Ⅱ. Date/Time Rules
+- All generated timestamps must use current system time, formatted as YYYY/MM/DD HH:mm.
+- NEVER copy timestamps from existing content.
+- If a file contains:
+      @time: YYYY/MM/DD HH:mm
+  → update it automatically to the current timestamp whenever the file is edited.
+- When creating a new file with an author/file header, automatically insert:
+      @time: YYYY/MM/DD HH:mm
+
+# Ⅲ. Changelog Structure Rules (Flat Structure)
+- ALWAYS follow the existing style seen in earlier entries of CHANGELOG.md.
+- DO NOT introduce section headers such as “### 新增”, “### 优化”, “### 修复”, etc.
+- Use a **flat list** of bullet items:
+  - 每条以 “新增：… / 优化：… / 修复：… / 移除：… / 变更：… / 重大变更：…” 开头
+  - 保留你现有的“主项 + 子项”子弹结构；子级 bullet 缩进不变。
+
+When generating a new changelog entry, the format MUST be:
+
+## {new_version} - {current_datetime} ({git_user_name})
+{English one-line summary}
+
+- 优化：xxxx
+- 优化：AAAA
+- 新增：yyyy
+- 修复：zzzz
+- 重大变更：aaaa
+…
+
+RULES FOR THIS SECTION:
+- {git_user_name} must be retrieved from `git config user.name`.
+- The English summary MUST be a single, imperative sentence, one line only, no trailing period.
+- DO NOT output extra blocks like:
+  “主要变更内容：”
+  “Changes:”
+  “Summary:”
+- DO NOT output any “### xxx” headings.
+- DO NOT output numbered lists (1., 2., …).
+- NEVER collapse multiple items into one.
+- NEVER merge categories; every item must self-identify via its prefix (“新增：/优化：/修复：…”).
+- Do NOT delete, compress or rewrite existing bullets; for new versions, keep the same level of detail as before（可参考 1.0.0 的主项 + 子项结构）.
+
+Classification Rules (MANDATORY)
+--------------------------------
+Every bullet must be classified into one of the following categories by using the correct prefix:
+“新增：”, “优化：”, “修复：”, “移除：”, “变更：”, “重大变更：”.
+
+Cursor MUST choose the correct prefix based on the nature of the change.
+Using only “优化：” for all items is strictly forbidden.
+
+Below are the REQUIRED definitions for each category:
+
+1. “新增：”
+   Used when the change ADDS something that did not exist before:
+   - 新增功能
+   - 新增命令、新增接口、新增类、新增函数
+   - 新增文档、新增测试
+   - 新增模块、文件、新增环境变量、新增配置项
+   Examples:
+   - 新增：添加新的日志文档 utils.md
+   - 新增：创建 metrics/new_metric.py 文件
+
+2. “修复：”
+   Used when the change fixes an issue or bug:
+   - 修复异常、修复报错、修复崩溃
+   - 修复路径、拼写、导入错误
+   - 修复测试失败
+   - 修复错误逻辑、边界条件、异常处理
+   Examples:
+   - 修复：移除 tests/test_config.py 中不必要的 logging 配置代码
+   - 修复：修正 CSV 解析时的编码错误
+
+3. “优化：”
+   Used for improvements WITHOUT adding or fixing:
+   - 改进性能、结构、可读性
+   - 重构代码
+   - 简化导入逻辑、减少依赖、统一调用方式
+   - 提升可维护性
+   Examples:
+   - 优化：重构日志系统，统一使用 print(level=...) 输出
+   - 优化：简化 analyzer.py 内部的逻辑路径
+
+4. “移除：”
+   Used when something is removed:
+   - 删除功能、删除文件、删除字段
+   - 删除不再使用的模块或逻辑
+   Examples:
+   - 移除：删除旧版 logging 初始化逻辑
+   - 移除：移除 deprecated 模块 config_old.py
+
+5. “变更：”
+   Used for backward-compatible behavior changes:
+   - 修改默认行为、修改默认参数
+   - 配置项变化但仍向后兼容
+   Examples:
+   - 变更：修改默认的日志级别为 info
+
+6. “重大变更：”
+   Used for breaking changes that are NOT backward compatible:
+   - API 改名、删除字段
+   - 模块/目录重构
+   - 需要业务方升级代码
+   Examples:
+   - 重大变更：重构项目结构至 src/review_core/
+   - 重大变更：删除旧版 ingest API
+
+Rules:
+- Cursor MUST classify correctly based on these definitions.
+- Cursor MUST NOT classify everything as “优化：”.
+- Cursor MUST NOT guess randomly; it must read item content carefully.
+- Cursor MUST adjust bullet prefix automatically when necessary.
+
+
+# Ⅳ. Editing Behavior
+- Always insert the new changelog block at the very top of CHANGELOG.md.
+- Never modify or rewrite historical entries unless the user explicitly asks.
+- Preserve indentation, bullet style, and all formatting.
+- Only add new content; do not reformat anything else.
+
+# Ⅴ. Forbidden Behavior
+- Do NOT generate future timestamps.
+- Do NOT copy timestamps from git log or other files.
+- Do NOT generate English section titles (Added/Changed/Fixed).
+- Do NOT create summary paragraphs.
+- Do NOT change bullet prefix words (“新增：优化：修复：…” are mandatory).
+
+# End of rules

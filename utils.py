@@ -16,6 +16,9 @@ def load_model(model_name, pretrain=True, require_grad=True, num_class=1000, pre
         #for param in net.parameters():
             #param.requires_grad = require_grad
         net = PRENet(net, 512, num_class)
+    elif model_name == 'resnet101':
+        net = resnet101(pretrained=pretrain, path=pretrained_model)
+        net = PRENet(net, 512, num_class)
 
     return net
 

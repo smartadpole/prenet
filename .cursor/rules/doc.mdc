@@ -1,0 +1,90 @@
+---
+alwaysApply: true
+---
+# Documentation & File Generation Rules
+
+You are strictly bound by the following documentation and file generation standards.
+
+## 1. Documentation Structure Standards
+All documentation must be classified into exactly two categories and placed in specific locations.
+
+### A. User & Runtime Documentation (End-User Focus)
+* **Purpose:** Guides for installing, running, and using the software.
+* **Locations:**
+    * `README.md` (Root): High-level introduction, quick start.
+    * `README_*.md` (Optional): Module-specific readmes if the project is large.
+    * `docs/user/`: Detailed user manuals, configuration guides, or operational playbooks.
+* **Tone:** Clear, instructive, non-technical (black box perspective).
+
+### B. Developer Documentation (Contributor/Maintainer Focus)
+* **Purpose:** Deep technical context for upgrades, migration, maintenance, and traceability.
+* **Location:** Strictly inside `docs/dev/`.
+* **Tone:** Technical, architectural, precise (white box perspective).
+
+---
+
+## 2. Developer Documentation Content Matrix
+When creating or updating files in `docs/dev/`, you must address the following five pillars to ensure consistency:
+
+### I. Business Logic & Rationale
+* **Flows:** Describe core business processes using pseudocode or text flows.
+* **Design Decisions:** Explicitly explain "Why this design?" (Design Rationale) to aid future refactoring.
+* **Visuals:** Insert Mermaid flowcharts **ONLY** when explaining complex logic branches.
+
+### II. Features & Modules
+* **Boundaries:** Define clear module boundaries and responsibilities.
+* **Details:** Document implementation details of key feature points.
+
+### III. Tools & Dependencies
+* **Internal Utils:** Explain the purpose and usage of internal utility classes.
+* **External Libs:** List dependencies with usage context and strictly enforced version limitations.
+* **Toolchain:** Document build scripts, testing frameworks, and CI tools.
+* **Cleanup**: If a tool is no longer needed due to a requirement change, remove it from the list immediately.
+
+### IV. Interfaces & Data
+* **APIs:** Define Input/Output formats, strict Exception handling rules, and error codes.
+* **Data:** Explain Database Schema (ER relationships) and key fields.
+
+### V. Requirements & Context Traceability (Crucial for AI Coding)
+* **Prompt to Requirement:** Before coding, transform the raw User Prompt into a standardized **Requirement Specification**.
+* **Strategy Integration:** Combine the Requirement with a specific **Design Strategy**.
+* **Coherence:** Ensure this new requirement logically connects with existing Business Logic (Pillar I), Features (Pillar II), and Tools (Pillar III).
+* **Persistence:** Record this "Requirement + Strategy + Implementation" context into a dedicated file (e.g., `doc/dev/requirements_trace.md` or feature-specific doc) to ensure the intent is preserved for future migrations.
+* **Conflict Check**: Before coding, check if the new requirement contradicts any existing Logic (Pillar I) or Requirements.
+
+---
+
+## 3. Conflict Resolution & Versioning Protocol (CRITICAL)
+
+If a new requirement conflicts with existing logic, you must strictly follow this **"Supersede & Purge"** flow:
+
+1. **Trace (The "What"):** In your requirements tracking file (e.g., `docs/dev/requirements_trace.md`):
+* Mark the old requirement as `[Superseded]`.
+* Link it to the new requirement ID.
+* *Example:* `~~REQ-01: Sync Processing~~ -> [Superseded by REQ-05: Async Queue]`
+
+2. **Rationale (The "Why"):** In `docs/dev/architecture.md` (Pillar I), explicitly record the **Design Change**:
+* State clearly: "We switched from A to B because [Reason]."
+
+3. **Rewrite (The "How"):**
+* **Rule:** The documentation must reflect the **current** state.
+* **Action:** Completely rewrite the affected Feature (Pillar II) and Interface (Pillar IV) sections. Do not keep "legacy descriptions" alongside new ones.
+
+4. **Purge (The "Cleanup"):**
+* Remove implementation code, configurations, and dependencies (Pillar III) associated with the old logic. **No zombie code.**
+
+---
+
+## 4. Anti-Clutter & Update Protocols
+* **Clean Output:** NEVER generate temporary files, log files, `.bak`, or random notes outside `docs/`.
+* **Atomic Updates:** Code changes trigger immediate documentation updates.
+    * *Rule:* Code Change -> Update corresponding `docs/dev/` section -> Verify consistency with Requirements.
+* **No Redundancy:** Do not create separate "update logs". The documentation reflects the *current* state of the system including its design history.
+
+## 5. Enforcement Checklist
+Before outputting any file, verify:
+1.  **Target Audience:** Is this for End User (`docs/user`) or Developer (`docs/dev`)?
+2.  **Content Depth:** Did I cover Logic, Features, Tools, Data?
+3.  **Traceability:** Did I convert the *User Prompt* into a *Standardized Requirement* and document the *Design Strategy* in `doc/dev/`?
+4.  **Conflict Handling**: Did I explicitly mark old conflicting requirements as superseded and explain the rationale?
+5.  **Cleanup:** Is this a random note? -> DELETE IT. Did I purge the old logic/dependencies from the docs and code?

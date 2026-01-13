@@ -1,0 +1,38 @@
+---
+alwaysApply: true
+---
+# Python File Header Rules
+
+All newly created Python files MUST include the standard file header.
+When I ask you to create a new Python file, generates the content starting with:
+
+#!/usr/bin/env python3
+# encoding: utf-8
+'''
+@author: <AUTHOR_NAME>
+@contact: <CONTACT_EMAIL>
+@file: <FILENAME>
+@time: <CURRENT_DATETIME>
+@desc: <DESCRIPTION>
+'''
+
+## Field Filling Instructions:
+1.  **@author & @contact**:
+    - Attempt to infer the author and email from the current git repository context (e.g., other files' headers or git config if visible).
+    - If you cannot infer it, use:
+      - @author: 孙昊
+      - @contact: smartadpole@163.com
+    - (You can modify the default values above to match your preference).
+
+2.  **@file**:
+    - Use the actual filename (e.g., `analyzer.py`).
+
+3.  **@time**:
+    - Use the current time in the format: `YYYY/MM/DD HH:MM` (e.g., 2025/11/18 16:17).
+
+4.  **@desc**:
+    - Generate a concise summary of what the code does based on my instructions or the code context.
+
+5.  **Strict Adherence**:
+    - Do not omit this header in new Python files.
+    - Ensure strict indentation and spacing as shown in the example.

@@ -18,12 +18,11 @@ def parse_option():
     parser = argparse.ArgumentParser('Progressive Region Enhancement Network(PRENet) for training and testing')
 
     parser.add_argument('--batchsize', default=2, type=int, help="batch size for single GPU")
-    parser.add_argument('--dataset', type=str, default='food101', help='food2k, food101, food500')
-    parser.add_argument('--image_path', type=str, default="E:/datasets/food101/images/", help='path to dataset')
-    parser.add_argument("--train_path", type=str, default="E:/datasets/food101/meta_data/train_full.txt", help='path to training list')
-    parser.add_argument("--test_path", type=str, default="E:/datasets/food101/meta_data/test_full.txt",
-                        help='path to testing list')
-    parser.add_argument('--weight_path', default="E:/Pretrained_model/food2k_resnet50_0.0001.pth", help='path to the pretrained model')
+    parser.add_argument('--dataset', type=str, default='other', help='food2k, food101, food500, other')
+    parser.add_argument('--image_path', type=str, help='path to dataset, datasets/food101/images/')
+    parser.add_argument("--train_path", type=str, required=False, help='path to training list, datasets/food101/meta_data/train_full.txt')
+    parser.add_argument("--test_path", type=str, required=False, help='path to testing list, datasets/food101/meta_data/test_full.txt')
+    parser.add_argument('--weight_path', help='path to the pretrained model, Pretrained_model/food2k_resnet50_0.0001.pth')
     parser.add_argument('--use_checkpoint', action='store_true', default=True,
                         help="whether to use gradient checkpointing to save memory")
     parser.add_argument('--checkpoint', type=str, default="E:/Pretrained_model/model.pth",
@@ -34,7 +33,7 @@ def parse_option():
                         help="The initial learning rate for SGD.")
     parser.add_argument("--epoch", default=200, type=int,
                         help="The number of epochs.")
-    parser.add_argument("--test", action='store_true', default=True,
+    parser.add_argument("--test", action='store_true', default=False,
                         help="Testing model.")
     args, unparsed = parser.parse_known_args()
     return args
@@ -163,8 +162,10 @@ def train(nb_epoch, trainloader, testloader, batch_size, store_name, start_epoch
 
 def main():
     args = parse_option()
-    train_dataset, train_loader, test_dataset, test_loader = \
-        load_data(image_path=args.image_path, train_dir=args.train_path, test_dir=args.test_path,batch_size=args.batchsize)
+    if args.test_path and args.train_path:
+        train_dataset, train_loader, test_dataset, test_loader = load_data(image_path=args.image_path, train_dir=args.train_path, test_dir=args.test_path,batch_size=args.batchsize)
+    else:
+        train_dataset, train_loader, test_dataset, test_loader = load_data(image_path=args.image_path, batch_size=args.batchsize)
     print('Data Preparation : Finished')
     if args.dataset == "food101":
         NUM_CATEGORIES = 101
@@ -172,9 +173,11 @@ def main():
         NUM_CATEGORIES = 500
     elif args.dataset == "food2k":
         NUM_CATEGORIES = 2000
+    elif args.dataset == "other":
+        NUM_CATEGORIES = 179 # category number + 1
 
 
-    net = load_model('resnet50',pretrain=False,require_grad=True,num_class=NUM_CATEGORIES)
+    net = load_model('resnet101',pretrain=False,require_grad=True,num_class=NUM_CATEGORIES)
     net.fc = nn.Linear(2048, 2000)
     state_dict = {}
     pretrained = torch.load(args.weight_path)
@@ -186,7 +189,7 @@ def main():
             state_dict[k] = pretrained[re.sub(r'xx[0-9]\.?',".", k[9:])]
         else:
             state_dict[k] = v
-            print(k)
+            # print(k)
 
     net.load_state_dict(state_dict)
     net.fc = nn.Linear(2048, NUM_CATEGORIES)
@@ -213,8 +216,7 @@ def main():
     net.cuda()
     net = nn.DataParallel(net)
 
-    if args.use_checkpoint:
-        #net.load_state_dict(torch.load(checkpath))
+    if args.use_checkpoint and os.path.isfile(args.checkpoint):
         model = torch.load(args.checkpoint).module.state_dict()
 
         net.module.load_state_dict(torch.load(args.checkpoint).module.state_dict())
