@@ -14,6 +14,8 @@ from torchvision.transforms import functional as TF
 from PIL import Image
 from tqdm import tqdm
 from unified_data_loader import load_unified_dataset
+from time import time
+import datetime as _dt
 
 # --------- Augmentations ----------
 class RandomJPEG:
@@ -161,6 +163,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--batch_size", "-b", type=int, default=64)
     ap.add_argument("--num_workers", type=int, default=6)
+    ap.add_argument("--num_classes", type=int, required=True)
     ap.add_argument("--lr_head", "-lr", type=float, default=3e-4)
     ap.add_argument("--lr_backbone", type=float, default=1e-5)
     ap.add_argument("--weight_decay", type=float, default=0.05)
@@ -198,15 +201,7 @@ def main():
     )
     
     # Get number of classes
-    if hasattr(train_set, 'classes'):
-        num_classes = len(train_set.classes)
-    elif hasattr(train_set, 'dataset') and hasattr(train_set.dataset, 'classes'):
-        num_classes = len(train_set.dataset.classes)
-    else:
-        # For text list format, infer from labels
-        all_labels = [label for _, label in train_set]
-        num_classes = max(all_labels) + 1
-    
+    num_classes = args.num_classes
     print(f"[Info] num_classes={num_classes}, train={len(train_set)}, val={len(val_set)}")
 
     head = ArcFaceHead(args.embed_dim, num_classes, s=args.arc_s, m=args.arc_m).to(device)
@@ -238,12 +233,24 @@ def main():
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
     scaler = GradScaler(enabled=(device == "cuda"))
 
-    best = 0.0
+    best_train_acc = 0.0
+    best_val_acc = 0.0
     global_step = 0
 
     output_dir = args.output_dir if args.output_dir else "output_dinov2_arcface_small"
     os.makedirs(output_dir, exist_ok=True)
-    model_path = os.path.join(output_dir, "best_dinov2_arcface_small.pt")
+    best_train_model_path = os.path.join(output_dir, "best_train_dinov2_arcface_small.pt")
+    best_val_model_path = os.path.join(output_dir, "best_val_dinov2_arcface_small.pt")
+    
+    # Log file path
+    log_path = os.path.join(output_dir, "results_test.txt")
+
+    # Get classes if available (for saving models)
+    classes = None
+    if hasattr(train_set, 'classes'):
+        classes = train_set.classes
+    elif hasattr(train_set, 'dataset') and hasattr(train_set.dataset, 'classes'):
+        classes = train_set.dataset.classes
 
     for epoch in range(1, args.epochs + 1):
         # Stage2 switch
@@ -257,6 +264,10 @@ def main():
 
         embedder.train()
         head.train()
+
+        train_loss = 0.0
+        train_correct = 0
+        train_total = 0
 
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs}")
         for x, y in pbar:
@@ -273,33 +284,69 @@ def main():
             scheduler.step()
             global_step += 1
 
+            # Calculate training accuracy
+            with torch.no_grad():
+                W = F.normalize(head.W, dim=1)
+                eval_logits = head.s * F.linear(z, W)
+                pred = eval_logits.argmax(dim=1)
+                train_correct += (pred == y).sum().item()
+                train_total += y.numel()
+
+            train_loss += loss.item()
             pbar.set_postfix(loss=float(loss.detach().cpu()))
 
-        acc = evaluate(embedder, head, val_loader, device)
-        print(f"[Val] acc={acc:.4f}")
+        # Calculate training accuracy
+        train_acc = train_correct / max(1, train_total)
+        avg_train_loss = train_loss / len(train_loader)
 
-        if acc > best:
-            best = acc
-            # Get classes if available
-            classes = None
-            if hasattr(train_set, 'classes'):
-                classes = train_set.classes
-            elif hasattr(train_set, 'dataset') and hasattr(train_set.dataset, 'classes'):
-                classes = train_set.dataset.classes
-            
+        # Evaluate on validation set
+        val_acc = evaluate(embedder, head, val_loader, device)
+        
+        # Print combined accuracy log
+        print(f"Epoch {epoch:3d} | train_acc = {train_acc:.5f} | val_acc = {val_acc:.5f} | train_loss = {avg_train_loss:.5f}")
+
+        # Check and save best models
+        saved_train = 0
+        saved_val = 0
+        if train_acc > best_train_acc:
+            best_train_acc = train_acc
+            saved_train = 1
             torch.save(
                 {
                     "embedder": embedder.state_dict(),
                     "head": head.state_dict(),
                     "classes": classes,
                     "args": vars(args),
-                    "best_acc": best,
+                    "best_train_acc": best_train_acc,
+                    "epoch": epoch,
                 },
-                model_path,
+                best_train_model_path,
             )
-            print(f"[Save] best_acc={best:.4f} -> {model_path}")
 
-    print(f"[Done] best_acc={best:.4f}")
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            saved_val = 1
+            torch.save(
+                {
+                    "embedder": embedder.state_dict(),
+                    "head": head.state_dict(),
+                    "classes": classes,
+                    "args": vars(args),
+                    "best_val_acc": best_val_acc,
+                    "epoch": epoch,
+                },
+                best_val_model_path,
+            )
+
+        # Log combined results to file
+        with open(log_path, 'a') as f:
+            timestamp = _dt.datetime.fromtimestamp(time()).strftime('%Y-%m-%d %H:%M')
+            f.write(
+                f'[{timestamp}] Iteration {epoch:3d} | train_acc = {train_acc:.5f} | val_acc = {val_acc:.5f} | '
+                f'train_loss = {avg_train_loss:.5f} | saved_train = {saved_train} | saved_val = {saved_val}\n'
+            )
+
+    print(f"[Done] best_train_acc={best_train_acc:.4f}, best_val_acc={best_val_acc:.4f}")
 
 
 if __name__ == "__main__":

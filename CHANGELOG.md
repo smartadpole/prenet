@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2 - 2026/01/15 01:33 (smartadpole)
+Enhance training monitoring and model saving in train_dinov2_arcface_small
+
+- 重大变更：`train_dinov2_arcface_small.py` 中 `--num_classes` 参数改为必需参数，移除自动推断类别数的逻辑
+- 新增：`train_dinov2_arcface_small.py` 中添加训练准确率计算功能，实时监控训练过程
+- 新增：添加结果日志文件 `results_test.txt`，记录每个 epoch 的训练准确率、验证准确率和训练损失
+- 优化：分别保存最佳训练准确率模型和最佳验证准确率模型，保存路径分别为 `best_train_dinov2_arcface_small.pt` 和 `best_val_dinov2_arcface_small.pt`
+- 优化：改进训练日志输出格式，统一显示训练准确率、验证准确率和训练损失
+
 ## 0.1.1 - 2026/01/14 16:47 (smartadpole)
 Unify dataset loading across multiple formats
 
