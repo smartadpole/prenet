@@ -50,13 +50,13 @@ def build_train_tfm(img_size: int):
     return transforms.Compose([
         CenterSquareCrop(),
         transforms.Resize(img_size, interpolation=transforms.InterpolationMode.BICUBIC),
-        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.3), ratio=(0.85, 1.2)),
+        transforms.RandomResizedCrop(img_size, scale=(0.6, 1.5), ratio=(0.8, 1.3)),
         transforms.RandomHorizontalFlip(p=0.5),
         RandomJPEG(p=0.5),
-        transforms.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.20, hue=0.05),
-        transforms.RandomApply([transforms.GaussianBlur(3, sigma=(0.1, 1.2))], p=0.2),
+        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.40, hue=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(7, sigma=(0.1, 3))], p=0.5),
         transforms.ToTensor(),
-        transforms.RandomErasing(p=0.25, scale=(0.01, 0.08), ratio=(0.3, 3.3), value="random"),
+        transforms.RandomErasing(p=0.5, scale=(0.2, 0.33), ratio=(0.3, 3.3), value="random"),
         normalize,
     ])
 
