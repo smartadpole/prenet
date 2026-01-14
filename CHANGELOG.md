@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.1 - 2026/01/14 16:47 (smartadpole)
+Unify dataset loading across multiple formats
+
+- 新增：创建 `unified_data_loader.py` 统一数据加载模块，支持 ImageFolder 和文本列表两种数据集格式
+- 新增：`unified_data_loader.py` 中实现自动格式检测功能，根据目录结构或文件自动识别数据集格式
+- 新增：`TextListDataset` 类支持从文本文件加载数据集，兼容逗号和空格分隔符
+- 优化：`train_dinov2_arcface_small.py` 使用统一数据加载器，支持多种数据集格式
+- 优化：`data_loader.py` 中的 `load_data` 函数内部使用统一数据加载器，保持向后兼容
+- 优化：统一数据加载器支持显式指定路径或自动检测，提高灵活性
+- 优化：移除冗余的 `image_root` 参数，统一使用 `data_root` 作为图片根目录，简化接口
+- 变更：`train_dinov2_arcface_small.py` 新增 `--train_path`、`--val_path` 参数支持灵活的数据集路径配置
+
 ## 0.1.0 - 2026/01/14 03:43 (smartadpole)
 Improve data loader flexibility and command-line interface
 

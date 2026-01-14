@@ -7,6 +7,7 @@ import argparse
 from tqdm import tqdm
 import torch.optim as optim
 from data_loader import load_data
+from unified_data_loader import load_unified_dataset
 from torch.optim import lr_scheduler
 import torch.backends.cudnn as cudnn
 import re
@@ -152,13 +153,15 @@ def train(nb_epoch, trainloader, testloader, batch_size, store_name, start_epoch
                 train_loss4 / (idx + 1)))
 
         val_acc, val5_acc, val_acc_com, val5_acc_com, val_loss = test(net, CELoss, batch_size, testloader,True)
+        saved = 0
         if val_acc > max_val_acc:
             max_val_acc = val_acc
-            torch.save(net, './' + store_name + '/model.pth')
+            torch.save(net, os.path.join(store_name, '/model.pth'))
+            saved = 1
         with open(exp_dir + '/results_test.txt', 'a') as file:
             file.write(
-                'Iteration %d, top1 = %.5f, top5 = %.5f, top1_combined = %.5f, top5_combined = %.5f, test_loss = %.6f\n' % (
-                    epoch, val_acc, val5_acc, val_acc_com, val5_acc_com, val_loss))
+                'Iteration %d, saved = %d, top1 = %.5f, top5 = %.5f, top1_combined = %.5f, top5_combined = %.5f, test_loss = %.6f\n' % (
+                    epoch, saved, val_acc, val5_acc, val_acc_com, val5_acc_com, val_loss))
 
 def main():
     args = parse_option()
@@ -228,12 +231,14 @@ def main():
                 val_acc, val5_acc, val_acc_com, val5_acc_com, val_loss))
         return
 
-
+    output_dir = args.output_dir
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     train(nb_epoch=args.epoch,             # number of epoch
              trainloader=train_loader,
              testloader=test_loader,
              batch_size=args.batchsize,         # batch size
-             store_name='model_448_from2k',     # folder for output
+             store_name=output_dir,     # folder for output
              start_epoch=0,
              net=net,
             optimizer = optimizer,
