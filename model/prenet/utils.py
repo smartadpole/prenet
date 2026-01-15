@@ -1,13 +1,8 @@
-import numpy as np
 import random
-import torch
-import torchvision
 from torch.autograd import Variable
-from torchvision import transforms, models
-import torch.nn.functional as F
 from tqdm import tqdm
-from model import *
-from Resnet import *
+from model.prenet.model import *
+from model.prenet.Resnet import *
 
 def load_model(model_name, pretrain=True, require_grad=True, num_class=1000, pretrained_model=None):
     print('==> Building model..')

@@ -1,10 +1,13 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from self_attention import self_attention
-from layer_self_attention import layer_self_attention
-from dropblock import DropBlock2D
+from model.prenet.layer_self_attention import layer_self_attention
 import numpy as np
+import torch.nn as nn
+import torch
+from model.prenet.self_attention import self_attention
+from dropblock import DropBlock2D
+
 
 class PRENet(nn.Module):
     def __init__(self, model, feature_size, classes_num):
