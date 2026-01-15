@@ -21,7 +21,7 @@ if str(SRC_DIR) not in sys.path:
 
 import os
 import re
-from review_core.utils import logger
+from utils import logger
 
 __all__ = ["FILE_SUFFIX", "walk", "mkdir_simple", "write_txt", "walk_image", "get_images"
     , 'read_image_list', 'match_images']

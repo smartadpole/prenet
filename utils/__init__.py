@@ -13,7 +13,7 @@ if str(SRC_DIR) not in sys.path:
 
 
 from .config import get_api_key, load_env_file, get_config, remove_bom, mask_secret
-from review_core.utils import logger
+from utils import logger
 
 __all__ = [
     'get_api_key', 'load_env_file', 'get_config',

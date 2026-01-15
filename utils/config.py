@@ -22,7 +22,10 @@ if str(SRC_DIR) not in sys.path:
 
 import os
 from typing import Optional
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("Please install python-dotenv package: pip install python-dotenv")
 
 __all__ = ['load_env_file', 'get_api_key', 'get_config', 'mask_secret', 'remove_bom']
 

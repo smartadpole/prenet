@@ -20,7 +20,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 
-from review_core.utils.config import load_env_file
+from utils.config import load_env_file
 import builtins
 import logging
 from logging.handlers import RotatingFileHandler

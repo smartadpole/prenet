@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.3 - 2026/01/15 17:10 (smartadpole)
+Add DINOv2 classification test tool and improve visualization
+
+- 新增：创建 `tools/test_dinov2_classification.py` 测试脚本，支持 DINOv2 ArcFace 模型的图像分类和结果可视化
+- 新增：`test_dinov2_classification.py` 中实现图像分类功能，支持批量处理嵌套目录中的图像
+- 新增：`test_dinov2_classification.py` 中实现分类结果文本导出功能，生成 CSV 格式的结果文件
+- 优化：`visualize_by_category` 函数改为每个类别单独绘制一张大图，提高可视化清晰度
+- 优化：`test_dinov2_classification.py` 从 `train_dinov2_arcface_small.py` 导入 `CenterSquareCrop` 和 `make_divisible`，移除重复定义
+- 修复：修正 `utils/__init__.py`、`utils/file.py`、`utils/logger.py` 中的导入路径，从 `review_core.utils` 改为 `utils`
+- 修复：修正 `utils/config.py` 中 `dotenv` 导入，添加异常处理避免缺少依赖时崩溃
+- 修复：修正 `test_dinov2_classification.py` 中结果文件写入格式，移除多余的括号
+
 ## 0.1.2 - 2026/01/15 01:33 (smartadpole)
 Enhance training monitoring and model saving in train_dinov2_arcface_small
 

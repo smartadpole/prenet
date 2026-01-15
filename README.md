@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.0
+**Version:** 0.1.3
 
 ### Introduction
 ![method](Method.png)
