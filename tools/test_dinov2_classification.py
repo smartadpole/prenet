@@ -12,6 +12,14 @@ import argparse
 import csv
 import os
 import sys
+
+
+# Add parent directory to path
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(CURRENT_DIR)
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -26,13 +34,6 @@ from train_dinov2_arcface_small import DinoV2Embedder
 from train_dinov2_arcface_small import ArcFaceHead
 from train_dinov2_arcface_small import build_val_tfm, CenterSquareCrop, make_divisible
 from utils.utils import timeit
-
-# Add parent directory to path
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PARENT_DIR = os.path.dirname(CURRENT_DIR)
-if PARENT_DIR not in sys.path:
-    sys.path.insert(0, PARENT_DIR)
-
 from utils.file import walk_image
 
 
