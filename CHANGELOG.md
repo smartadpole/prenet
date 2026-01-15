@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 - 2026/01/15 17:36 (smartadpole)
+Add batch inference support and CSV output format for classification test tool
+
+- 优化：`test_dinov2_classification.py` 中 `classify` 函数支持批量推理，提升 GPU 推理性能
+- 新增：`test_dinov2_classification.py` 中新增 `classify_batch` 函数，实现批量图像加载和推理
+- 优化：`test_dinov2_classification.py` 中主程序改为批量处理图像，充分利用 GPU 并行计算能力
+- 变更：`test_dinov2_classification.py` 中结果文件格式从文本文件改为标准 CSV 格式，便于数据分析
+- 新增：`test_dinov2_classification.py` 中添加 CSV 模块导入，使用 `csv.writer` 确保格式正确性
+
 ## 0.1.3 - 2026/01/15 17:10 (smartadpole)
 Add DINOv2 classification test tool and improve visualization
 

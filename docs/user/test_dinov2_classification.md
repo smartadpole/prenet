@@ -38,7 +38,7 @@ python tools/test_dinov2_classification.py \
 | `--image_dir` | str | 是 | - | 包含图像的目录路径（支持嵌套目录） |
 | `--output_dir` | str | 否 | `test_output` | 结果输出目录 |
 | `--device` | str | 否 | `cuda` | 推理设备（`cuda` 或 `cpu`） |
-| `--batch_size` | int | 否 | 32 | 批处理大小（当前版本未使用，保留用于未来扩展） |
+| `--batch_size` | int | 否 | 32 | 批处理大小，用于批量推理加速 |
 | `--max_images_per_class` | int | 否 | 20 | 每个类别在可视化中显示的最大图像数量 |
 | `--num_classes` | int | 否 | None | 类别数量（如果检查点中未包含） |
 
@@ -75,21 +75,24 @@ python tools/test_dinov2_classification.py \
 
 工具会在输出目录中生成以下文件：
 
-### 1. 分类结果文本文件
+### 1. 分类结果 CSV 文件
 
-**文件路径：** `{output_dir}/{model_name}/classification_results.txt`
+**文件路径：** `{output_dir}/{model_name}/classification_results.csv`
 
-**格式：** CSV 格式，每行包含：
+**格式：** 标准 CSV 格式，包含表头行：
 ```
-图像路径,类别索引,类别名称,置信度
+image_path,class_index,class_name,confidence
 ```
 
 **示例：**
-```
+```csv
+image_path,class_index,class_name,confidence
 data/test_images/class_001/img1.jpg,0,apple,0.9876
 data/test_images/class_001/img2.jpg,0,apple,0.9234
 data/test_images/class_002/img1.jpg,1,banana,0.8765
 ```
+
+**说明：** CSV 格式便于在 Excel、Python pandas 等工具中打开和分析。
 
 ### 2. 可视化图表
 

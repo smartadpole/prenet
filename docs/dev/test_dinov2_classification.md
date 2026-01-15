@@ -26,11 +26,11 @@ test_dinov2_classification.py
 ```
 图像目录 → walk_image() → 图像路径列表
     ↓
-classify_image() → 分类结果 (pred_class, confidence, logits)
+分批处理 (batch_size) → classify_batch() → 批量分类结果
     ↓
 image_results 字典 → visualize_by_category() → PNG 图表
     ↓
-results_by_class 字典 → 文本文件导出
+results_by_class 字典 → CSV 文件导出
 ```
 
 ## 核心功能实现
@@ -55,34 +55,39 @@ results_by_class 字典 → 文本文件导出
 - `train_dinov2_arcface_small.DinoV2Embedder`
 - `train_dinov2_arcface_small.ArcFaceHead`
 
-### 2. 图像分类 (`classify`, `classify_image`)
+### 2. 图像分类 (`classify`, `classify_batch`, `classify_image`)
 
-**职责：** 对单张图像进行推理分类
+**职责：** 对图像进行推理分类，支持单张和批量处理
 
 **实现细节：**
 
-`classify()` 函数：
-- 输入：嵌入器、分类头、图像张量
+`classify()` 函数（v0.1.4 更新）：
+- 输入：嵌入器、分类头、图像张量 `[batch_size, C, H, W]`
 - 使用 `@timeit(100)` 装饰器进行性能统计
 - 推理流程：
-  1. 通过嵌入器获取特征向量 `z`
+  1. 通过嵌入器获取特征向量 `z`（批量）
   2. 归一化分类头权重矩阵 `W`
   3. 计算 logits：`s * linear(z, W)`（评估时不使用 margin）
   4. 计算 softmax 概率
-  5. 返回预测类别、置信度、原始 logits
+  5. 返回批量预测类别、置信度、原始 logits（Tensor 格式）
 
-`classify_image()` 函数：
-- 输入：嵌入器、分类头、图像路径、变换管道、设备
+`classify_batch()` 函数（v0.1.4 新增）：
+- 输入：嵌入器、分类头、图像路径列表、变换管道、设备
 - 处理流程：
-  1. 使用 PIL 打开并转换为 RGB
-  2. 应用图像变换（`build_val_tfm`）
-  3. 添加批次维度并移动到指定设备
-  4. 调用 `classify()` 进行推理
-  5. 异常处理：捕获图像加载和推理错误
+  1. 批量加载图像并应用变换
+  2. 堆叠为 batch tensor
+  3. 调用 `classify()` 进行批量推理
+  4. 处理加载失败的图像，保持结果顺序
+  5. 返回结果列表，每个元素为 `(pred_class, confidence, logits)` 元组
+
+`classify_image()` 函数（向后兼容）：
+- 内部调用 `classify_batch()` 处理单张图像
+- 保持原有接口不变
 
 **性能优化：**
 - 使用 `@torch.no_grad()` 禁用梯度计算
-- 支持批量处理（当前版本为单张处理，保留接口用于未来扩展）
+- **批量推理（v0.1.4）：** 充分利用 GPU 并行计算，显著提升处理速度
+- 批量处理减少 GPU 与 CPU 之间的数据传输次数
 
 ### 3. 可视化 (`visualize_by_category`)
 
@@ -157,13 +162,34 @@ def load_model(model_path: str, device: str = "cuda") -> Tuple[DinoV2Embedder, A
     pass
 
 @torch.no_grad()
-def classify(embedder, head, img_tensor) -> Tuple[int, float, torch.Tensor]:
-    """分类推理（核心逻辑）"""
+def classify(embedder, head, img_tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """批量分类推理（核心逻辑）
+    
+    Args:
+        img_tensor: [batch_size, C, H, W] 图像张量
+    
+    Returns:
+        pred_classes: [batch_size] 预测类别索引
+        confidences: [batch_size] 置信度分数
+        logits: [batch_size, num_classes] 原始 logits
+    """
+    pass
+
+@torch.no_grad()
+def classify_batch(embedder, head, image_paths: list, transform, device: str) -> List[Tuple[Optional[int], Optional[float], Optional[torch.Tensor]]]:
+    """批量分类图像
+    
+    Args:
+        image_paths: 图像路径列表
+    
+    Returns:
+        结果列表，每个元素为 (pred_class, confidence, logits) 元组
+    """
     pass
 
 @torch.no_grad()
 def classify_image(embedder, head, image_path: str, transform, device: str) -> Tuple[Optional[int], Optional[float], Optional[torch.Tensor]]:
-    """分类单张图像（带异常处理）"""
+    """分类单张图像（向后兼容，内部调用 classify_batch）"""
     pass
 
 def visualize_by_category(image_results: dict, classes: list = None, output_path: str = None, max_images_per_class: int = 20) -> None:
@@ -211,21 +237,23 @@ def visualize_by_category(image_results: dict, classes: list = None, output_path
 
 - **推理速度：** 使用 `@timeit(100)` 装饰器统计平均推理时间
 - **GPU 加速：** 支持 CUDA 设备加速推理
-- **批处理：** 当前版本为单张处理，接口保留 `--batch_size` 参数用于未来扩展
+- **批量推理（v0.1.4）：** 实现真正的批量处理，充分利用 GPU 并行计算能力，显著提升处理速度
+- **批处理大小：** 通过 `--batch_size` 参数控制，默认 32，可根据 GPU 内存调整
 
 ## 已知限制
 
-1. **批处理未实现：** `--batch_size` 参数当前未使用，所有图像逐张处理
-2. **内存限制：** 处理大量图像时可能遇到内存问题
-3. **图像格式：** 依赖 PIL 支持的格式，某些特殊格式可能无法处理
+1. **内存限制：** 批量处理时，batch_size 过大可能导致 GPU 内存不足
+2. **图像格式：** 依赖 PIL 支持的格式，某些特殊格式可能无法处理
+3. **错误处理：** 批量处理中单个图像加载失败不影响其他图像，但会降低批次效率
 
 ## 未来改进方向
 
-1. **实现批处理：** 利用 `--batch_size` 参数实现真正的批量推理
-2. **多进程处理：** 对于 CPU 模式，可以使用多进程加速
+1. **动态批处理：** 根据 GPU 内存自动调整 batch_size
+2. **多进程处理：** 对于 CPU 模式，可以使用多进程加速图像加载
 3. **结果缓存：** 支持结果缓存，避免重复计算
 4. **交互式可视化：** 支持 Web 界面或 Jupyter notebook 交互式查看
 5. **性能分析：** 添加更详细的性能分析工具
+6. **异步 I/O：** 使用异步 I/O 提升图像加载速度
 
 ## 测试建议
 

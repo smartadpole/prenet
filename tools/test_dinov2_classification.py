@@ -9,6 +9,7 @@
 '''
 
 import argparse
+import csv
 import os
 import sys
 import torch
@@ -84,20 +85,89 @@ def load_model(model_path: str, device: str = "cuda"):
 @timeit(100)
 @torch.no_grad()
 def classify(embedder, head, img_tensor):
+    """
+    Classify batch of images.
+    
+    Args:
+        embedder: DinoV2Embedder model
+        head: ArcFaceHead model
+        img_tensor: Tensor of shape [batch_size, C, H, W]
+        
+    Returns:
+        pred_classes: Tensor of shape [batch_size], predicted class indices
+        confidences: Tensor of shape [batch_size], confidence scores
+        logits: Tensor of shape [batch_size, num_classes], raw logits
+    """
     z = embedder(img_tensor)
     W = F.normalize(head.W, dim=1)
     logits = head.s * F.linear(z, W)  # no margin at eval
     probs = F.softmax(logits, dim=1)
 
-    pred_class = logits.argmax(dim=1).item()
-    confidence = probs[0, pred_class].item()
+    pred_classes = logits.argmax(dim=1)
+    confidences = probs.gather(1, pred_classes.unsqueeze(1)).squeeze(1)
 
-    return pred_class, confidence, logits
+    return pred_classes, confidences, logits
+
+@torch.no_grad()
+def classify_batch(embedder, head, image_paths: list, transform, device: str):
+    """
+    Classify a batch of images.
+    
+    Args:
+        embedder: DinoV2Embedder model
+        head: ArcFaceHead model
+        image_paths: List of image file paths
+        transform: Image transform pipeline
+        device: Device to run inference on
+        
+    Returns:
+        results: List of tuples (predicted_class, confidence, logits) for each image
+                 If an image fails to load, the tuple will be (None, None, None)
+    """
+    batch_tensors = []
+    valid_indices = []
+    valid_paths = []
+    
+    # Load and transform images
+    for idx, img_path in enumerate(image_paths):
+        try:
+            img = Image.open(img_path).convert('RGB')
+            img_tensor = transform(img)
+            batch_tensors.append(img_tensor)
+            valid_indices.append(idx)
+            valid_paths.append(img_path)
+        except Exception as e:
+            print(f"[Warning] Failed to load {img_path}: {e}")
+    
+    if len(batch_tensors) == 0:
+        return [(None, None, None)] * len(image_paths)
+    
+    # Stack into batch tensor
+    batch_tensor = torch.stack(batch_tensors).to(device)
+    
+    # Classify batch
+    pred_classes, confidences, logits = classify(embedder, head, batch_tensor)
+    
+    # Convert to CPU and numpy for easier handling
+    pred_classes = pred_classes.cpu()
+    confidences = confidences.cpu()
+    logits = logits.cpu()
+    
+    # Build results list
+    results = [(None, None, None)] * len(image_paths)
+    for i, valid_idx in enumerate(valid_indices):
+        results[valid_idx] = (
+            pred_classes[i].item(),
+            confidences[i].item(),
+            logits[i:i+1]  # Keep as tensor for consistency
+        )
+    
+    return results
 
 @torch.no_grad()
 def classify_image(embedder, head, image_path: str, transform, device: str):
     """
-    Classify a single image.
+    Classify a single image (kept for backward compatibility).
     
     Args:
         embedder: DinoV2Embedder model
@@ -111,15 +181,8 @@ def classify_image(embedder, head, image_path: str, transform, device: str):
         confidence: float, confidence score
         logits: torch.Tensor, raw logits
     """
-    try:
-        img = Image.open(image_path).convert('RGB')
-        img_tensor = transform(img).unsqueeze(0).to(device)
-        pred_class, confidence, logits = classify(embedder, head, img_tensor)
-        
-        return pred_class, confidence, logits.cpu()
-    except Exception as e:
-        print(f"[Warning] Failed to process {image_path}: {e}")
-        return None, None, None
+    results = classify_batch(embedder, head, [image_path], transform, device)
+    return results[0]
 
 
 def visualize_by_category(image_results: dict, classes: list = None, output_path: str = None, max_images_per_class: int = 20):
@@ -290,35 +353,47 @@ def main():
         print("[Error] No images found in the specified directory")
         return
     
-    # Classify images
-    print("\n[Info] Classifying images...")
+    # Classify images in batches
+    print(f"\n[Info] Classifying images with batch_size={args.batch_size}...")
     image_results = {}
     results_by_class = defaultdict(list)
     
-    for img_path in tqdm(image_paths, desc="Processing"):
-        pred_class, confidence, logits = classify_image(embedder, head, img_path, transform, device)
-        if pred_class is not None:
-            image_results[img_path] = (pred_class, confidence, logits)
-            class_name = classes[pred_class] if classes and pred_class < len(classes) else f"Class_{pred_class}"
-            results_by_class[pred_class].append((img_path, confidence))
+    # Process images in batches
+    num_batches = (len(image_paths) + args.batch_size - 1) // args.batch_size
+    with tqdm(total=len(image_paths), desc="Processing") as pbar:
+        for batch_idx in range(num_batches):
+            start_idx = batch_idx * args.batch_size
+            end_idx = min(start_idx + args.batch_size, len(image_paths))
+            batch_paths = image_paths[start_idx:end_idx]
+            
+            # Classify batch
+            batch_results = classify_batch(embedder, head, batch_paths, transform, device)
+            
+            # Process results
+            for img_path, (pred_class, confidence, logits) in zip(batch_paths, batch_results):
+                if pred_class is not None:
+                    image_results[img_path] = (pred_class, confidence, logits)
+                    class_name = classes[pred_class] if classes and pred_class < len(classes) else f"Class_{pred_class}"
+                    results_by_class[pred_class].append((img_path, confidence))
+                pbar.update(1)
     
     # Print summary
     print(f"\n[Info] Successfully classified {len(image_results)}/{len(image_paths)} images")
     
-    # Save text results
+    # Save results as CSV
     os.makedirs(output_dir, exist_ok=True)
-    results_file = os.path.join(output_dir, "classification_results.txt")
-    with open(results_file, 'w', encoding='utf-8') as f:
-        f.write("Image Classification Results\n")
-        f.write("=" * 80 + "\n\n")
+    results_file = os.path.join(output_dir, "classification_results.csv")
+    with open(results_file, 'w', encoding='utf-8-sig', newline='') as f:
+        writer = csv.writer(f)
+        # Write header
+        writer.writerow(['image_path', 'class_index', 'class_name', 'confidence'])
+        # Write data rows
         for class_idx in sorted(results_by_class.keys()):
             class_name = classes[class_idx] if classes and class_idx < len(classes) else f"Class_{class_idx}"
-            # f.write(f"Class {class_idx} ({class_name}): {len(results_by_class[class_idx])} images\n")
             for img_path, confidence in sorted(results_by_class[class_idx], key=lambda x: x[1], reverse=True):
-                f.write(f"{img_path},{class_idx},{class_name},{confidence:.4f}\n")
-            # f.write("\n")
+                writer.writerow([img_path, class_idx, class_name, f"{confidence:.4f}"])
     
-    print(f"[Info] Text results saved to {results_file}")
+    print(f"[Info] CSV results saved to {results_file}")
     
     # Visualize results
     print("\n[Info] Generating visualization...")
