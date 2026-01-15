@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5 - 2026/01/16 01:06 (smartadpole)
+Enhance training data augmentation with advanced transformations
+
+- 优化：`train_dinov2_arcface_small.py` 中 `build_train_tfm` 函数升级数据增强策略，添加仿射变换和透视变换，模拟视角变换与随机摆放
+- 优化：增强烟雾与环境干扰模拟，包括随机 JPEG 压缩、色彩抖动、大核高斯模糊和随机灰度化，提升模型对复杂光照条件的鲁棒性
+- 优化：改进遮挡处理，使用双重随机擦除策略，分别模拟手部或较大物体遮挡（随机噪点块）和结构化遮挡（黑色或深色实心块）
+- 优化：调整数据增强参数，包括随机裁剪缩放范围、仿射变换参数和透视变换扭曲程度，提升数据增强效果
+
 ## 0.1.4 - 2026/01/15 17:36 (smartadpole)
 Add batch inference support and CSV output format for classification test tool
 
