@@ -66,7 +66,7 @@ def load_model(model_path: str, device: str = "cuda"):
         raise ValueError("Cannot determine num_classes from checkpoint. Please specify --num_classes.")
     
     # Build model
-    embedder = DinoV2Embedder(backbone, embed_dim).to(device)
+    embedder = DinoV2Embedder(backbone, embed_dim, train=False).to(device)
     head = ArcFaceHead(embed_dim, num_classes, s=arc_s, m=arc_m).to(device)
     
     # Load weights

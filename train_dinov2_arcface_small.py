@@ -76,14 +76,14 @@ class DinoV2Embedder(nn.Module):
     """
     DINOv2 backbone -> mean pool patch tokens -> projection -> L2 normalize
     """
-    def __init__(self, backbone_name="dinov2_vitb14", embed_dim=256):
+    def __init__(self, backbone_name="dinov2_vitb14", embed_dim=256, train=True):
         super().__init__()
         print(f"[Info] Loading DINOv2 backbone: {backbone_name}")
         hub_dir = os.path.expanduser("~/.cache/torch/hub/facebookresearch_dinov2_main")
         if os.path.exists(hub_dir):
-            self.backbone = torch.hub.load(hub_dir, backbone_name, source='local', pretrained=True)
+            self.backbone = torch.hub.load(hub_dir, backbone_name, source='local', pretrained=train)
         else:
-            self.backbone = torch.hub.load("facebookresearch/dinov2", backbone_name)
+            self.backbone = torch.hub.load("facebookresearch/dinov2", backbone_name, pretrained=train)
         print(f"load pretrained={True}, embed_dim={embed_dim}")
         in_dim = self.backbone.embed_dim
         self.proj = nn.Sequential(
