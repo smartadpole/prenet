@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.8 - 2026/01/16 17:41 (smartadpole)
+Add batch inference tool for CSV-based image classification with bbox cropping
+
+- 新增：创建 `tools/test_full.py` 批量推理工具，支持从 CSV 文件读取图片路径和 bbox 信息进行批量分类
+- 新增：`test_full.py` 中实现 `parse_bbox` 函数，解析归一化 bbox 坐标（格式：x y w h）并转换为像素坐标
+- 新增：`test_full.py` 中实现 `crop_image_by_bbox` 函数，根据 bbox 坐标从原始图片中裁剪出目标区域
+- 新增：`test_full.py` 中实现 `collect_all_images` 函数，批量收集和裁剪所有需要处理的图片
+- 新增：`test_full.py` 支持处理 4 种类型的图片：取走目标的第一帧、取走目标的过线帧、放回目标的过线帧、放回目标的静止帧
+- 新增：`test_full.py` 输出 CSV 文件包含 8 列预测结果（每张图片的类别名称和置信度）
+- 优化：`test_full.py` 复用 `eval.py` 中的 `load_model`、`classify_batch`、`build_val_tfm` 函数，避免重复实现
+- 优化：`test_full.py` 复用 `test_dinov2_classification.py` 中的 `load_label_file` 函数加载类别名称映射
+- 优化：`test_full.py` 使用批量处理策略，先收集所有图片再批量推理，提高处理效率
+- 优化：`test_full.py` 输出类别名称而不是类别ID，提升结果可读性
+- 新增：`test_full.py` 支持通过 `--label_file` 参数指定类别名称映射文件
+- 新增：`test_full.py` 支持通过 `--base_dir` 参数指定图片根目录，支持相对路径解析
+- 新增：`test_full.py` 添加完善的错误处理，处理图片缺失、bbox 解析失败等情况
+
 ## 0.1.7 - 2026/01/16 15:23 (smartadpole)
 Add evaluation script with accuracy metrics and per-class visualization
 
