@@ -45,7 +45,7 @@ plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示为方块的问�
 # --------- Model Definition (from train_dinov2_arcface_small.py) ----------
 def load_label_file(label_path: str):
     """
-    Load class labels from a text file.
+    Load class labels from a text file with security checks.
     
     File format: First column is class ID (integer), second column is class name.
     Supports space or tab separated values.
@@ -57,13 +57,63 @@ def load_label_file(label_path: str):
         classes: List of class names, where index corresponds to class ID
                 Returns None if file doesn't exist or is empty
     """
-    if not os.path.exists(label_path):
+    if not label_path:
+        print("[Warning] Label file path is empty")
+        return None
+    
+    # Security constants
+    MAX_LABEL_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    ALLOWED_LABEL_EXTENSIONS = {'.txt', '.csv'}
+    
+    # Normalize path to prevent directory traversal
+    try:
+        normalized_path = os.path.normpath(os.path.abspath(label_path))
+    except Exception as e:
+        print(f"[Warning] Invalid label file path: {e}")
+        return None
+    
+    # Check if file exists
+    if not os.path.exists(normalized_path):
+        print(f"[Warning] Label file does not exist: {normalized_path}")
+        return None
+    
+    # Check if it's a file (not directory)
+    if not os.path.isfile(normalized_path):
+        print(f"[Warning] Label path is not a file: {normalized_path}")
+        return None
+    
+    # Check file extension
+    ext = os.path.splitext(normalized_path)[1].lower()
+    if ext not in ALLOWED_LABEL_EXTENSIONS:
+        print(f"[Warning] Label file extension '{ext}' is not allowed. Allowed: {ALLOWED_LABEL_EXTENSIONS}")
+        return None
+    
+    # Check file size
+    try:
+        file_size = os.path.getsize(normalized_path)
+        if file_size > MAX_LABEL_FILE_SIZE:
+            size_mb = file_size / (1024 * 1024)
+            max_mb = MAX_LABEL_FILE_SIZE / (1024 * 1024)
+            print(f"[Warning] Label file size ({size_mb:.2f}MB) exceeds maximum ({max_mb:.2f}MB)")
+            return None
+    except Exception as e:
+        print(f"[Warning] Failed to check label file size: {e}")
+        return None
+    
+    # Check if file is readable
+    if not os.access(normalized_path, os.R_OK):
+        print(f"[Warning] Label file is not readable: {normalized_path}")
         return None
 
     try:
         classes_dict = {}
-        with open(label_path, 'r', encoding='utf-8') as f:
+        with open(normalized_path, 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
+                # Limit number of lines to prevent DoS
+                if line_num > 100000:
+                    print(f"[Warning] Label file has too many lines (>100000), stopping at line {line_num}")
+                    break
+                
                 line = line.strip()
                 if not line:  # Skip empty lines
                     continue
@@ -71,28 +121,49 @@ def load_label_file(label_path: str):
                 # Try to split by tab first, then by space
                 parts = line.split('\t') if '\t' in line else line.split(',') if ',' in line else line.split(' ')
                 if len(parts) < 2:
-                    print(f"[Warning] Line {line_num} in {label_path} has less than 2 columns, skipping: {line}")
+                    print(f"[Warning] Line {line_num} in {normalized_path} has less than 2 columns, skipping: {line}")
                     continue
 
-                class_id = int(parts[0])
-                class_name = parts[1].strip()
-                classes_dict[class_id] = class_name
+                try:
+                    class_id = int(parts[0])
+                    class_name = parts[1].strip()
+                    # Validate class_id is non-negative
+                    if class_id < 0:
+                        print(f"[Warning] Line {line_num}: Invalid class ID (must be >= 0): {class_id}")
+                        continue
+                    # Validate class_name is not empty
+                    if not class_name:
+                        print(f"[Warning] Line {line_num}: Empty class name")
+                        continue
+                    classes_dict[class_id] = class_name
+                except ValueError as e:
+                    print(f"[Warning] Line {line_num}: Failed to parse class ID: {e}")
+                    continue
 
         if not classes_dict:
-            print(f"[Warning] No valid labels found in {label_path}")
+            print(f"[Warning] No valid labels found in {normalized_path}")
             return None
 
         # Convert dict to list, ensuring all indices are filled
         max_id = max(classes_dict.keys())
+        # Limit maximum class ID to prevent memory issues
+        if max_id > 100000:
+            print(f"[Warning] Maximum class ID ({max_id}) is too large, limiting to 100000")
+            max_id = 100000
+        
         classes = [None] * (max_id + 1)
         for class_id, class_name in classes_dict.items():
-            classes[class_id] = class_name
+            if class_id <= max_id:
+                classes[class_id] = class_name
 
-        print(f"[Info] Loaded {len(classes_dict)} class labels from {label_path}")
+        print(f"[Info] Loaded {len(classes_dict)} class labels from {normalized_path}")
         return classes
 
+    except PermissionError as e:
+        print(f"[Warning] Permission denied when reading label file {normalized_path}: {e}")
+        return None
     except Exception as e:
-        print(f"[Warning] Failed to load label file {label_path}: {e}")
+        print(f"[Warning] Failed to load label file {normalized_path}: {e}")
         return None
 
 

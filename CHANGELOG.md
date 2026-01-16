@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.10 - 2026/01/16 20:36 (smartadpole)
+Add security checks for label file and detailed logging for image cropping
+
+- 新增：`test_full.py` 中添加文件安全检查工具函数（`validate_file_path`、`validate_file_size`、`validate_file_extension`、`safe_read_file`），提供路径验证、文件大小限制、扩展名检查等安全功能
+- 新增：`test_full.py` 中定义安全常量（文件大小限制、允许的文件扩展名白名单）
+- 新增：`test_dinov2_classification.py` 中 `load_label_file` 函数添加完整的安全检查，包括路径规范化（防止目录遍历攻击）、文件存在性检查、文件类型验证（仅允许 .txt, .csv）、文件大小限制（10MB）、文件可读性检查
+- 新增：`load_label_file` 函数添加行数限制（最多 100000 行，防止 DoS 攻击）
+- 新增：`load_label_file` 函数添加 Class ID 验证（必须 >= 0，最大 100000，防止内存耗尽）
+- 优化：`test_full.py` 中 `collect_all_images` 函数添加详细的日志记录，包括每个处理步骤的 DEBUG 级别日志
+- 优化：`collect_all_images` 函数添加失败原因统计和分类（image_not_found、bbox_parse_error、save_error、missing_column、empty_image_name 等）
+- 优化：`collect_all_images` 函数输出失败统计摘要和前 10 个失败样本的详细信息，便于快速定位问题
+- 优化：`test_full.py` 中 `parse_bbox`、`load_image`、`crop_image_by_bbox`、`save_cropped_image` 函数添加详细的 DEBUG 级别日志记录
+- 优化：`load_label_file` 函数改进错误处理，添加更详细的警告信息，包括文件路径、行号、具体错误原因等
+
 ## 0.1.9 - 2026/01/16 19:29 (smartadpole)
 Add visualization feature for test_full.py and create requirements.txt
 
