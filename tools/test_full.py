@@ -22,6 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 from eval import load_model, classify_batch, build_val_tfm
 from test_dinov2_classification import load_label_file
+import chardet
 from utils.logger import logger_manager, Logger
 logger_manager.set_log_level(level="DEBUG")
 
@@ -335,6 +336,11 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
     print(f"[Info] Successfully cropped {len(tasks)} images, {len(failed_tasks)} failed")
     return tasks, failed_tasks
 
+def read_csv_safe(path, **kwargs):
+    with open(path, "rb") as f:
+        encoding = chardet.detect(f.read(100000))["encoding"]
+
+    return pd.read_csv(path, encoding=encoding, **kwargs)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -384,7 +390,7 @@ def main():
     # Read input CSV
     print(f"[Info] Reading CSV from {args.input_csv}")
     try:
-        df = pd.read_csv(args.input_csv, encoding='utf-8')
+        df = pd.read_csv_safe(args.input_csv, encoding='utf-8')
     except Exception as e:
         print(f"[Error] Failed to read CSV: {e}")
         return
