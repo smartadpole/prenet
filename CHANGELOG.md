@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.6 - 2026/01/16 14:42 (smartadpole)
+Add label file support for classification test tool
+
+- 新增：`test_dinov2_classification.py` 中新增 `load_label_file` 函数，支持从文本文件读取类别标签
+- 新增：`test_dinov2_classification.py` 中添加 `--label` 命令行参数，支持指定标签文件路径
+- 优化：`load_label_file` 函数支持多种分隔符格式（制表符、逗号、空格），提高文件格式兼容性
+- 优化：`test_dinov2_classification.py` 中主程序支持从外部标签文件覆盖 checkpoint 中的类别名称，提升灵活性
+- 优化：`load_label_file` 函数添加完善的错误处理和警告信息，提高健壮性
+
 ## 0.1.5 - 2026/01/16 01:06 (smartadpole)
 Enhance training data augmentation with advanced transformations
 

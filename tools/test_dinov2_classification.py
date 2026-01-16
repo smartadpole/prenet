@@ -13,7 +13,6 @@ import csv
 import os
 import sys
 
-
 # Add parent directory to path
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(CURRENT_DIR)
@@ -36,8 +35,67 @@ from train_dinov2_arcface_small import build_val_tfm, CenterSquareCrop, make_div
 from utils.utils import timeit
 from utils.file import walk_image
 
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
+plt.rcParams['font.sans-serif'] = ['SimHei', 'WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'Droid Sans Fallback']
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示为方块的问题
+
 
 # --------- Model Definition (from train_dinov2_arcface_small.py) ----------
+def load_label_file(label_path: str):
+    """
+    Load class labels from a text file.
+    
+    File format: First column is class ID (integer), second column is class name.
+    Supports space or tab separated values.
+    
+    Args:
+        label_path: Path to label file (.txt)
+        
+    Returns:
+        classes: List of class names, where index corresponds to class ID
+                Returns None if file doesn't exist or is empty
+    """
+    if not os.path.exists(label_path):
+        return None
+
+    try:
+        classes_dict = {}
+        with open(label_path, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:  # Skip empty lines
+                    continue
+
+                # Try to split by tab first, then by space
+                parts = line.split('\t') if '\t' in line else line.split(',') if ',' in line else line.split(' ')
+                if len(parts) < 2:
+                    print(f"[Warning] Line {line_num} in {label_path} has less than 2 columns, skipping: {line}")
+                    continue
+
+                class_id = int(parts[0])
+                class_name = parts[1].strip()
+                classes_dict[class_id] = class_name
+
+        if not classes_dict:
+            print(f"[Warning] No valid labels found in {label_path}")
+            return None
+
+        # Convert dict to list, ensuring all indices are filled
+        max_id = max(classes_dict.keys())
+        classes = [None] * (max_id + 1)
+        for class_id, class_name in classes_dict.items():
+            classes[class_id] = class_name
+
+        print(f"[Info] Loaded {len(classes_dict)} class labels from {label_path}")
+        return classes
+
+    except Exception as e:
+        print(f"[Warning] Failed to load label file {label_path}: {e}")
+        return None
+
+
 def load_model(model_path: str, device: str = "cuda"):
     """
     Load model from checkpoint file.
@@ -51,7 +109,7 @@ def load_model(model_path: str, device: str = "cuda"):
     """
     print(f"[Info] Loading model from {model_path}")
     checkpoint = torch.load(model_path, map_location=device)
-    
+
     # Extract model parameters
     args = checkpoint.get("args", {})
     embed_dim = args.get("embed_dim", 256)
@@ -61,25 +119,25 @@ def load_model(model_path: str, device: str = "cuda"):
     arc_s = args.get("arc_s", 32.0)
     arc_m = args.get("arc_m", 0.30)
     classes = checkpoint.get("classes", None)
-    
+
     if num_classes is None:
         raise ValueError("Cannot determine num_classes from checkpoint. Please specify --num_classes.")
-    
+
     # Build model
     embedder = DinoV2Embedder(backbone, embed_dim, train=False).to(device)
     head = ArcFaceHead(embed_dim, num_classes, s=arc_s, m=arc_m).to(device)
-    
+
     # Load weights
     embedder.load_state_dict(checkpoint["embedder"])
     head.load_state_dict(checkpoint["head"])
-    
+
     embedder.eval()
     head.eval()
-    
+
     print(f"[Info] Model loaded: embed_dim={embed_dim}, num_classes={num_classes}, img_size={img_size}")
     if classes:
         print(f"[Info] Classes: {len(classes)} classes found")
-    
+
     return embedder, head, classes, args
 
 
@@ -109,6 +167,7 @@ def classify(embedder, head, img_tensor):
 
     return pred_classes, confidences, logits
 
+
 @torch.no_grad()
 def classify_batch(embedder, head, image_paths: list, transform, device: str):
     """
@@ -128,7 +187,7 @@ def classify_batch(embedder, head, image_paths: list, transform, device: str):
     batch_tensors = []
     valid_indices = []
     valid_paths = []
-    
+
     # Load and transform images
     for idx, img_path in enumerate(image_paths):
         try:
@@ -139,31 +198,32 @@ def classify_batch(embedder, head, image_paths: list, transform, device: str):
             valid_paths.append(img_path)
         except Exception as e:
             print(f"[Warning] Failed to load {img_path}: {e}")
-    
+
     if len(batch_tensors) == 0:
         return [(None, None, None)] * len(image_paths)
-    
+
     # Stack into batch tensor
     batch_tensor = torch.stack(batch_tensors).to(device)
-    
+
     # Classify batch
     pred_classes, confidences, logits = classify(embedder, head, batch_tensor)
-    
+
     # Convert to CPU and numpy for easier handling
     pred_classes = pred_classes.cpu()
     confidences = confidences.cpu()
     logits = logits.cpu()
-    
+
     # Build results list
     results = [(None, None, None)] * len(image_paths)
     for i, valid_idx in enumerate(valid_indices):
         results[valid_idx] = (
             pred_classes[i].item(),
             confidences[i].item(),
-            logits[i:i+1]  # Keep as tensor for consistency
+            logits[i:i + 1]  # Keep as tensor for consistency
         )
-    
+
     return results
+
 
 @torch.no_grad()
 def classify_image(embedder, head, image_path: str, transform, device: str):
@@ -186,7 +246,8 @@ def classify_image(embedder, head, image_path: str, transform, device: str):
     return results[0]
 
 
-def visualize_by_category(image_results: dict, classes: list = None, output_path: str = None, max_images_per_class: int = 20):
+def visualize_by_category(image_results: dict, classes: list = None, output_path: str = None,
+                          max_images_per_class: int = 20):
     """
     Visualize images grouped by predicted category. Each class is drawn in a separate figure.
     
@@ -201,21 +262,21 @@ def visualize_by_category(image_results: dict, classes: list = None, output_path
     for img_path, (pred_class, confidence, _) in image_results.items():
         if pred_class is not None:
             class_to_images[pred_class].append((img_path, confidence))
-    
+
     # Sort classes by number of images (descending)
     sorted_classes = sorted(class_to_images.items(), key=lambda x: len(x[1]), reverse=True)
-    
+
     print(f"\n[Info] Found {len(sorted_classes)} unique classes")
     for class_idx, images in sorted_classes:
         class_name = classes[class_idx] if classes and class_idx < len(classes) else f"Class_{class_idx}"
         print(f"  Class {class_idx} ({class_name}): {len(images)} images")
-    
+
     # Create visualization
     num_classes = len(sorted_classes)
     if num_classes == 0:
         print("[Warning] No valid predictions to visualize")
         return
-    
+
     # Determine output directory and base filename
     if output_path:
         if os.path.isdir(output_path) or output_path.endswith(os.sep):
@@ -227,31 +288,31 @@ def visualize_by_category(image_results: dict, classes: list = None, output_path
     else:
         output_dir = None
         base_filename = None
-    
+
     # Generate a separate figure for each class
     cols = 4
     saved_paths = []
-    
+
     for class_idx, images in sorted_classes:
         # Limit images per class
         images = sorted(images, key=lambda x: x[1], reverse=True)[:max_images_per_class]
         num_images = len(images)
         rows_for_class = (num_images + cols - 1) // cols  # Ceiling division
-        
+
         if num_images == 0:
             continue
-        
+
         # Create figure for this class
         fig = plt.figure(figsize=(16, min(rows_for_class * 1.5 + 1, 100)))  # Limit max height
         gs = gridspec.GridSpec(rows_for_class + 1, cols, figure=fig, hspace=0.3, wspace=0.2)
-        
+
         # Class title
         class_name = classes[class_idx] if classes and class_idx < len(classes) else f"Class_{class_idx}"
         ax_title = fig.add_subplot(gs[0, :])
         ax_title.axis('off')
-        ax_title.text(0.5, 0.5, f"Class {class_idx}: {class_name} ({len(images)} images)", 
-                     ha='center', va='center', fontsize=16, fontweight='bold')
-        
+        ax_title.text(0.5, 0.5, f"Class {class_idx}: {class_name} ({len(images)} images)",
+                      ha='center', va='center', fontsize=16, fontweight='bold')
+
         # Display images in rows
         for row in range(rows_for_class):
             for col in range(cols):
@@ -264,27 +325,27 @@ def visualize_by_category(image_results: dict, classes: list = None, output_path
                         ax.imshow(img)
                         ax.axis('off')
                         # Truncate filename if too long
-                        filename = os.path.basename(img_path)
+                        filename = os.path.basename(os.path.dirname(img_path))
                         if len(filename) > 20:
                             filename = filename[:17] + "..."
-                        ax.set_title(f"{filename}\nConf: {confidence:.3f}", 
-                                   fontsize=8, pad=2)
+                        ax.set_title(f"{filename}\nConf: {confidence:.3f}",
+                                     fontsize=8, pad=2)
                     except Exception as e:
                         ax = fig.add_subplot(gs[row + 1, col])
                         ax.axis('off')
                         filename = os.path.basename(img_path)
                         if len(filename) > 20:
                             filename = filename[:17] + "..."
-                        ax.text(0.5, 0.5, f"Error loading\n{filename}", 
-                               ha='center', va='center', fontsize=8, color='red')
+                        ax.text(0.5, 0.5, f"Error loading\n{filename}",
+                                ha='center', va='center', fontsize=8, color='red')
                 else:
                     # Fill empty cells
                     ax = fig.add_subplot(gs[row + 1, col])
                     ax.axis('off')
-        
-        plt.suptitle(f"Class {class_idx}: {class_name} - {len(images)} images", 
-                    fontsize=18, fontweight='bold', y=0.995)
-        
+
+        plt.suptitle(f"Class {class_idx}: {class_name} - {len(images)} images",
+                     fontsize=18, fontweight='bold', y=0.995)
+
         # Save or show
         if output_path:
             # Generate filename for this class
@@ -293,15 +354,16 @@ def visualize_by_category(image_results: dict, classes: list = None, output_path
                 class_output_path = os.path.join(output_dir, f"{base_filename}_class_{class_idx}_{safe_class_name}.png")
             else:
                 class_output_path = f"{base_filename}_class_{class_idx}_{safe_class_name}.png"
-            
-            os.makedirs(os.path.dirname(class_output_path) if os.path.dirname(class_output_path) else ".", exist_ok=True)
+
+            os.makedirs(os.path.dirname(class_output_path) if os.path.dirname(class_output_path) else ".",
+                        exist_ok=True)
             plt.savefig(class_output_path, dpi=150, bbox_inches='tight')
             saved_paths.append(class_output_path)
         else:
             plt.show()
-        
+
         plt.close()
-    
+
     if saved_paths:
         print(f"\n[Info] Generated {len(saved_paths)} visualization files:")
         for path in saved_paths:
@@ -310,55 +372,66 @@ def visualize_by_category(image_results: dict, classes: list = None, output_path
 
 def main():
     parser = argparse.ArgumentParser(description="Test DINOv2 ArcFace model on images")
-    parser.add_argument("--model_path", type=str, required=True, 
-                       help="Path to model checkpoint (.pt file)")
+    parser.add_argument("--model_path", type=str, required=True,
+                        help="Path to model checkpoint (.pt file)")
     parser.add_argument("--image_dir", type=str, required=True,
-                       help="Directory containing images (supports nested directories)")
+                        help="Directory containing images (supports nested directories)")
     parser.add_argument("--output_dir", type=str, default="test_output",
-                       help="Output directory for results")
+                        help="Output directory for results")
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"],
-                       help="Device to run inference on")
+                        help="Device to run inference on")
     parser.add_argument("--batch_size", "-b", type=int, default=32,
-                       help="Batch size for inference")
+                        help="Batch size for inference")
     parser.add_argument("--max_images_per_class", type=int, default=20,
-                       help="Maximum number of images to show per class in visualization")
+                        help="Maximum number of images to show per class in visualization")
     parser.add_argument("--num_classes", type=int, default=None,
-                       help="Number of classes (if not in checkpoint)")
+                        help="Number of classes (if not in checkpoint)")
+    parser.add_argument("--label", type=str, default=None,
+                        help="Path to label file (.txt). Format: first column is class ID, second column is class name. If not provided, uses classes from checkpoint.")
     args = parser.parse_args()
 
     name = os.path.basename(os.path.dirname(args.model_path))
     output_dir = os.path.join(args.output_dir, name)
-    
+
     device = args.device
     if device == "cuda" and not torch.cuda.is_available():
         device = "cpu"
         print("[Warning] CUDA not available, using CPU")
-    
+
     # Load model
     embedder, head, classes, model_args = load_model(args.model_path, device)
-    
+
+    # Load labels from file if provided
+    if args.label:
+        label_classes = load_label_file(args.label)
+        if label_classes is not None:
+            classes = label_classes
+            print(f"[Info] Using class labels from {args.label}")
+        else:
+            print(f"[Info] Label file {args.label} not found or invalid, using classes from checkpoint")
+
     # Override num_classes if provided
     if args.num_classes is not None:
         print(f"[Info] Overriding num_classes to {args.num_classes}")
-    
+
     # Build transform
     img_size = model_args.get("img_size", 128)
     transform = build_val_tfm(img_size)
-    
+
     # Collect all images
     print(f"\n[Info] Scanning images in {args.image_dir}")
     image_paths = walk_image(args.image_dir)
     print(f"[Info] Found {len(image_paths)} images")
-    
+
     if len(image_paths) == 0:
         print("[Error] No images found in the specified directory")
         return
-    
+
     # Classify images in batches
     print(f"\n[Info] Classifying images with batch_size={args.batch_size}...")
     image_results = {}
     results_by_class = defaultdict(list)
-    
+
     # Process images in batches
     num_batches = (len(image_paths) + args.batch_size - 1) // args.batch_size
     with tqdm(total=len(image_paths), desc="Processing") as pbar:
@@ -366,10 +439,10 @@ def main():
             start_idx = batch_idx * args.batch_size
             end_idx = min(start_idx + args.batch_size, len(image_paths))
             batch_paths = image_paths[start_idx:end_idx]
-            
+
             # Classify batch
             batch_results = classify_batch(embedder, head, batch_paths, transform, device)
-            
+
             # Process results
             for img_path, (pred_class, confidence, logits) in zip(batch_paths, batch_results):
                 if pred_class is not None:
@@ -377,10 +450,10 @@ def main():
                     class_name = classes[pred_class] if classes and pred_class < len(classes) else f"Class_{pred_class}"
                     results_by_class[pred_class].append((img_path, confidence))
                 pbar.update(1)
-    
+
     # Print summary
     print(f"\n[Info] Successfully classified {len(image_results)}/{len(image_paths)} images")
-    
+
     # Save results as CSV
     os.makedirs(output_dir, exist_ok=True)
     results_file = os.path.join(output_dir, "classification_results.csv")
@@ -393,14 +466,14 @@ def main():
             class_name = classes[class_idx] if classes and class_idx < len(classes) else f"Class_{class_idx}"
             for img_path, confidence in sorted(results_by_class[class_idx], key=lambda x: x[1], reverse=True):
                 writer.writerow([img_path, class_idx, class_name, f"{confidence:.4f}"])
-    
+
     print(f"[Info] CSV results saved to {results_file}")
-    
+
     # Visualize results
     print("\n[Info] Generating visualization...")
     vis_output_path = os.path.join(output_dir, "classification_visualization.png")
     visualize_by_category(image_results, classes, vis_output_path, args.max_images_per_class)
-    
+
     print("\n[Info] Test completed!")
 
 
