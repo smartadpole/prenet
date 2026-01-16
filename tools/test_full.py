@@ -336,11 +336,45 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
     print(f"[Info] Successfully cropped {len(tasks)} images, {len(failed_tasks)} failed")
     return tasks, failed_tasks
 
-def read_csv_safe(path, **kwargs):
-    with open(path, "rb") as f:
-        encoding = chardet.detect(f.read(100000))["encoding"]
+import pandas as pd
+import chardet
+import logging
 
-    return pd.read_csv(path, encoding=encoding, **kwargs)
+def read_csv_auto(
+        path,
+        encodings=("utf-8", "utf-8-sig", "gb18030", "gbk", "latin1"),
+        sample_size=100_000,
+        **kwargs
+):
+    """
+    自动识别 CSV 编码并读取
+    - 先用 chardet 探测
+    - 再按候选编码顺序 fallback
+    - 永不重复传 encoding
+    """
+
+    kwargs.pop("encoding", None)
+
+    try:
+        with open(path, "rb") as f:
+            raw = f.read(sample_size)
+        detected = chardet.detect(raw)
+        if detected["encoding"]:
+            encodings = (detected["encoding"],) + tuple(
+                e for e in encodings if e != detected["encoding"]
+            )
+    except Exception as e:
+        logging.warning(f"Encoding detection failed: {e}")
+
+    last_err = None
+    for enc in encodings:
+        try:
+            logging.debug(f"Trying CSV encoding: {enc}")
+            return pd.read_csv(path, encoding=enc, **kwargs)
+        except Exception as e:
+            last_err = e
+
+    raise RuntimeError(f"Failed to read CSV {path}") from last_err
 
 def main():
     parser = argparse.ArgumentParser(
@@ -390,7 +424,7 @@ def main():
     # Read input CSV
     print(f"[Info] Reading CSV from {args.input_csv}")
     try:
-        df = read_csv_safe(args.input_csv, encoding='utf-8')
+        df = read_csv_auto(args.input_csv)
     except Exception as e:
         print(f"[Error] Failed to read CSV: {e}")
         return
