@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.8
+**Version:** 0.1.9
 
 ### Introduction
 ![method](Method.png)
@@ -19,11 +19,23 @@ During training, after progressively training the networks from different stages
 
 - torchvision >= 0.4.2
 
-- PIL
+- PIL (Pillow)
 
 - Numpy 
 
+- pandas
+
+- tqdm
+
+- matplotlib
+
 - dropblock
+
+**Quick Installation:**
+
+```bash
+pip install -r requirements.txt
+```
 
 ### Data preparation
 
@@ -226,6 +238,55 @@ Example:
 **Metrics Calculated:**
 - Overall accuracy (with correct/wrong/total counts)
 - Per-class accuracy (with correct/wrong/total counts for each class)
+
+### CSV Batch Inference with Bbox Cropping
+
+To perform batch inference on images with bbox cropping from CSV file:
+
+```bash
+python tools/test_full.py \
+    --input_csv <input_csv_path> \
+    --output_csv <output_csv_path> \
+    --model_path <checkpoint_path> \
+    [OPTIONS]
+```
+
+**Required Parameters:**
+- `--input_csv`: Path to input CSV file containing image paths and bbox information
+- `--output_csv`: Path to output CSV file with classification results
+- `--model_path`: Path to model checkpoint (.pt file)
+
+**Optional Parameters:**
+- `--label_file`: Path to label file (.txt) with class names (optional)
+- `--base_dir`: Base directory for resolving relative image paths (default: current directory)
+- `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
+- `--batch_size`, `-b`: Batch size for inference (default: 32)
+- `--temp_dir`: Temporary directory for saving cropped images (default: `temp_cropped`)
+- `--visualize`: Enable visualization of images with bbox, label and confidence (default: False)
+- `--vis_output_dir`: Output directory for visualized images (default: `visualizations`, only used if `--visualize` is set)
+
+**Input CSV Format:**
+The CSV file should contain the following columns:
+- `take_first_image_name`, `take_first_bbox`: First frame image path and bbox
+- `take_cross_image_name`, `take_cross_bbox`: Crossing line frame image path and bbox
+- `return_image_name`, `return_bbox`: Return crossing frame image path and bbox
+- `return_static_image_name`, `return_static_bbox`: Return static frame image path and bbox
+
+Bbox format: normalized coordinates "x y w h" (space-separated, values in [0, 1])
+
+**Output:**
+- CSV file with 8 additional columns containing classification results:
+  - `take_first_image_label`, `take_first_image_confidence`
+  - `take_cross_image_label`, `take_cross_image_confidence`
+  - `return_image_label`, `return_image_confidence`
+  - `return_static_image_label`, `return_static_image_confidence`
+- If `--visualize` is enabled, visualization images are saved to the specified output directory
+
+**Visualization:**
+When `--visualize` is enabled, the tool generates visualization images showing:
+- Original image with red bounding box (bbox)
+- Label text with confidence score displayed near the bbox
+- Format: `class_name: confidence` (confidence with 3 decimal places)
 
 
 ## Contact

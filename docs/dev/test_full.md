@@ -16,6 +16,8 @@ test_full.py
 ├── 图片收集模块
 │   ├── collect_all_images()  # 批量收集和裁剪所有图片
 │   └── save_cropped_image()  # 保存裁剪后的临时图片
+├── 可视化模块
+│   └── visualize_image_with_bbox()  # 在原始图片上绘制 bbox、标签和置信度
 ├── 推理模块（复用）
 │   ├── load_model()          # 从 eval.py 导入
 │   ├── classify_batch()       # 从 eval.py 导入
@@ -88,13 +90,40 @@ CSV 文件 → 读取所有行
 - 遍历 DataFrame 的每一行
 - 对每行的 4 个图片字段进行处理
 - 临时文件命名格式：`row_{row_idx}_{prefix}_{original_filename}`
-- 返回成功任务列表和失败任务列表
+- 返回成功任务列表和失败任务列表，包含原始图片路径和 bbox 信息供可视化使用
 
 **输出：**
-- `tasks`: `List[Tuple[row_idx, field_prefix, temp_path]]`
+- `tasks`: `List[Tuple[row_idx, field_prefix, temp_path, orig_img_path, bbox_str]]`
 - `failed_tasks`: `List[Tuple[row_idx, field_prefix]]`
 
-### 4. 类别名称映射
+### 4. 可视化功能 (`visualize_image_with_bbox`)
+
+**职责：** 在原始图片上绘制 bbox、标签和置信度信息，并保存为可视化图片
+
+**实现细节：**
+- 加载原始图片并解析 bbox 坐标
+- 使用 PIL ImageDraw 在图片上绘制红色边界框
+- 在 bbox 附近显示标签文本和置信度（格式：`label: confidence`）
+- 自动调整字体大小和文本位置，确保文本在图片范围内
+- 支持跨平台字体加载（Windows/Linux/macOS）
+- 兼容不同版本的 PIL（支持 textbbox 和 textsize 方法）
+
+**字体加载策略：**
+- Windows: 尝试加载 Arial、Microsoft YaHei 等系统字体
+- Linux: 尝试加载 DejaVu Sans、Liberation Sans 等字体
+- macOS: 尝试加载 Helvetica、Arial 等字体
+- 如果系统字体不可用，回退到默认字体
+
+**可视化效果：**
+- 红色边界框（bbox）
+- 黑色背景的白色文本标签
+- 文本显示格式：`类别名称: 置信度`（置信度保留 3 位小数）
+
+**输出：**
+- 可视化图片保存到指定目录
+- 文件命名格式：`row_{row_idx}_{prefix}_{原文件名}_vis.jpg`
+
+### 5. 类别名称映射
 
 **职责：** 将预测的类别ID转换为类别名称
 
@@ -120,7 +149,7 @@ label_id class_name
 ```python
 pandas          # CSV 文件读写
 torch           # PyTorch 深度学习框架
-PIL (Pillow)    # 图像处理
+PIL (Pillow)    # 图像处理和可视化绘制
 tqdm            # 进度条显示
 ```
 
@@ -175,6 +204,25 @@ def collect_all_images(df: pd.DataFrame, base_dir: str, temp_dir: str) -> Tuple[
     
     Returns:
         (tasks, failed_tasks) 元组
+        tasks: List[Tuple[row_idx, field_prefix, temp_path, orig_img_path, bbox_str]]
+        failed_tasks: List[Tuple[row_idx, field_prefix]]
+    """
+    pass
+
+def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confidence: float, 
+                               output_path: str, base_dir: str = None) -> bool:
+    """在原始图片上绘制 bbox、标签和置信度并保存
+    
+    Args:
+        image_path: 原始图片路径（相对或绝对）
+        bbox_str: 归一化 bbox 字符串 "x y w h"
+        label: 预测的类别名称
+        confidence: 预测置信度
+        output_path: 可视化图片保存路径
+        base_dir: 基础目录，用于解析相对路径
+    
+    Returns:
+        True 如果成功，False 如果失败
     """
     pass
 ```
@@ -190,6 +238,8 @@ def collect_all_images(df: pd.DataFrame, base_dir: str, temp_dir: str) -> Tuple[
 --device         # 推理设备：cuda 或 cpu（默认：cuda）
 --batch_size     # 批量推理大小（默认：32）
 --temp_dir       # 临时文件目录（默认：temp_cropped）
+--visualize      # 是否进行可视化（默认：False）
+--vis_output_dir # 可视化图片输出目录（默认：visualizations，仅在 --visualize 启用时使用）
 ```
 
 ### 输入 CSV 格式
@@ -247,7 +297,12 @@ def collect_all_images(df: pd.DataFrame, base_dir: str, temp_dir: str) -> Tuple[
    - 使用类别名称映射将类别ID转换为名称
    - 处理失败的任务（设置为 None）
 
-6. **输出阶段**
+6. **可视化阶段**（可选）
+   - 如果启用 `--visualize` 参数，为每张成功分类的图片生成可视化结果
+   - 在原始图片上绘制 bbox、标签和置信度
+   - 保存可视化图片到指定目录
+
+7. **输出阶段**
    - 将结果保存到输出 CSV 文件
    - 使用 UTF-8-BOM 编码确保 Excel 正确显示中文
 
@@ -314,7 +369,7 @@ def collect_all_images(df: pd.DataFrame, base_dir: str, temp_dir: str) -> Tuple[
 3. **多格式支持：** 支持更多 bbox 格式（像素坐标、COCO 格式等）
 4. **并行裁剪：** 使用多进程加速图片裁剪
 5. **内存模式：** 支持直接在内存中处理，避免临时文件
-6. **可视化：** 添加可视化功能，显示裁剪后的图片和预测结果
+6. **可视化增强：** 支持自定义颜色、字体大小、文本位置等可视化选项
 
 ## 测试建议
 

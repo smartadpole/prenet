@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.9 - 2026/01/16 19:29 (smartadpole)
+Add visualization feature for test_full.py and create requirements.txt
+
+- 新增：`test_full.py` 中添加 `visualize_image_with_bbox` 函数，支持在原始图片上绘制 bbox、标签和置信度信息
+- 新增：`test_full.py` 中添加 `--visualize` 命令行参数，控制是否进行可视化
+- 新增：`test_full.py` 中添加 `--vis_output_dir` 命令行参数，指定可视化图片输出目录
+- 优化：`test_full.py` 中 `collect_all_images` 函数返回原始图片路径和 bbox 信息，供可视化使用
+- 新增：可视化功能支持跨平台字体加载（Windows/Linux/macOS）
+- 新增：可视化功能兼容不同版本的 PIL，支持 textbbox 和 textsize 方法
+- 新增：创建 `requirements.txt` 文件，包含所有项目依赖及版本要求
+- 优化：`README.md` 更新依赖列表，添加快速安装说明
+
 ## 0.1.8 - 2026/01/16 17:41 (smartadpole)
 Add batch inference tool for CSV-based image classification with bbox cropping
 
