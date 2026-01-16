@@ -82,7 +82,7 @@ def build_train_tfm(img_size: int):
         # 模拟烟雾/朦胧感：通过大核高斯模糊实现
         transforms.RandomApply([transforms.GaussianBlur(kernel_size=(7, 11), sigma=(0.1, 4.0))], p=0.3),
         # 随机灰度化：模拟极低光照下的红外监控模式
-        transforms.RandomGrayscale(p=0.1),
+        # transforms.RandomGrayscale(p=0.1),
 
         # --- 张量化与遮挡处理 ---
         transforms.ToTensor(),

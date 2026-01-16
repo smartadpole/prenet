@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.7 - 2026/01/16 15:23 (smartadpole)
+Add evaluation script with accuracy metrics and per-class visualization
+
+- 新增：创建 `tools/eval.py` 精度测评脚本，支持 DINOv2 ArcFace 模型的精度评估
+- 新增：`eval.py` 中实现 `load_test_file` 函数，支持从 txt 文件读取测试数据（三列格式：图片路径、标签ID、类别名称）
+- 新增：`eval.py` 中实现 `calculate_metrics` 函数，计算总体精度和分类别精度，并统计正确数、错误数、总数
+- 新增：`eval.py` 中实现 `visualize_results` 函数，按类别分组可视化，每个类别生成独立图片
+- 新增：可视化功能显示每个类别的前 10 个正确样本（按置信度排序）和所有错误样本
+- 新增：统计结果输出包含总体和分类别的精度、正确数、错误数、总数等详细信息
+- 新增：`eval.py` 中实现批量推理功能，支持通过 `--batch_size` 参数配置批量大小
+- 新增：结果保存为文本文件，包含完整的精度统计信息
+- 优化：`eval.py` 中测试文件解析逻辑支持制表符和空格分隔符，正确处理包含空格的图片路径
+
 ## 0.1.6 - 2026/01/16 14:42 (smartadpole)
 Add label file support for classification test tool
 

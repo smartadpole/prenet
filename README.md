@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.6
+**Version:** 0.1.7
 
 ### Introduction
 ![method](Method.png)
@@ -110,6 +110,122 @@ dataset
 | densenet161  | [google](https://drive.google.com/file/d/17PAUHmo1vIM9b4SlbpnLnwp1a5MH9Vem/view?usp=sharing)/[baidu](https://pan.baidu.com/s/1UllqjTJMAQEnGFVgzf6-nQ)(Code: bew5) |
 | inception_resnet_v2  | [google](https://drive.google.com/file/d/16PuZRuUB-YFKZT8JWycaay3JdfTlCoVK/view?usp=sharing)/[baidu](https://pan.baidu.com/s/1_974E4eZRzKubemLIQlOHA)(Code: xa8r) |
 | senet154  | [google](https://drive.google.com/file/d/1FGs7gH1fYybr3sKB6q4lRl36bX5wiLXw/view?usp=sharing)/[baidu](https://pan.baidu.com/s/1tHpFFSm2AySRjDZ4BTtboQ)(Code: kwzf) |
+
+---
+
+## DINOv2 ArcFace Model Tools
+
+This project also includes tools for training and evaluating DINOv2-based ArcFace classification models.
+
+### DINOv2 Training
+
+To train a DINOv2 ArcFace model:
+
+```bash
+python train_dinov2_arcface_small.py \
+    --data_root <dataset_root> \
+    --num_classes <number_of_classes> \
+    --train_path <train_path> \
+    --val_path <val_path> \
+    [OPTIONS]
+```
+
+**Required Parameters:**
+- `--data_root`: Root directory of the dataset
+- `--num_classes`: Number of classification classes (required)
+
+**Optional Parameters:**
+- `--train_path`: Path to training data file or directory (default: auto-detect `train.txt` in `data_root`)
+- `--val_path`: Path to validation data file or directory (default: auto-detect `val.txt` in `data_root`)
+- `--backbone`: DINOv2 backbone model (default: `dinov2_vitb14`)
+- `--img_size`: Input image size (default: 128)
+- `--embed_dim`: Embedding dimension (default: 256)
+- `--epochs`: Total training epochs (default: 20)
+- `--batch_size`, `-b`: Batch size (default: 64)
+- `--num_workers`: Number of data loading workers (default: 6)
+- `--lr_head`, `-lr`: Learning rate for head layers (default: 3e-4)
+- `--lr_backbone`: Learning rate for backbone layers (default: 1e-5)
+- `--weight_decay`: Weight decay (default: 0.05)
+- `--arc_s`: ArcFace scale parameter (default: 32.0)
+- `--arc_m`: ArcFace margin parameter (default: 0.30)
+- `--stage1_epochs`: Epochs to freeze backbone (default: 12)
+- `--unfreeze_blocks`: Number of last blocks to unfreeze in stage 2 (default: 1)
+- `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
+- `--output_dir`: Output directory for saved models (default: `output_dinov2_arcface_small`)
+
+The training process uses a two-stage approach:
+- **Stage 1**: Freezes the backbone and trains only the projection head and ArcFace head
+- **Stage 2**: Unfreezes the last N blocks of the backbone for fine-tuning
+
+### DINOv2 Classification Testing
+
+To classify images using a trained DINOv2 ArcFace model:
+
+```bash
+python tools/test_dinov2_classification.py \
+    --model_path <checkpoint_path> \
+    --image_dir <image_directory> \
+    [OPTIONS]
+```
+
+**Required Parameters:**
+- `--model_path`: Path to model checkpoint (.pt file)
+- `--image_dir`: Directory containing images (supports nested directories)
+
+**Optional Parameters:**
+- `--output_dir`: Output directory for results (default: `test_output`)
+- `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
+- `--batch_size`, `-b`: Batch size for inference (default: 32)
+- `--max_images_per_class`: Maximum images to show per class in visualization (default: 20)
+- `--label`: Path to label file (.txt) with class names (optional)
+
+**Output:**
+- CSV file with classification results (`classification_results.csv`)
+- Visualization images grouped by predicted category (one image per class)
+
+### DINOv2 Accuracy Evaluation
+
+To evaluate model accuracy with ground truth labels:
+
+```bash
+python tools/eval.py \
+    --model_path <checkpoint_path> \
+    --test_file <test_file> \
+    [OPTIONS]
+```
+
+**Required Parameters:**
+- `--model_path`: Path to model checkpoint (.pt file)
+- `--test_file`: Path to test file (.txt) with ground truth labels
+
+**Test File Format:**
+The test file should contain three columns per line (space or tab separated):
+```
+<absolute_image_path> <label_id> <class_name>
+```
+
+Example:
+```
+/path/to/image1.jpg 0 类别A
+/path/to/image2.jpg 1 类别B
+/path/to/image3.jpg 0 类别A
+```
+
+**Optional Parameters:**
+- `--output_dir`: Output directory for results (default: `eval_output`)
+- `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
+- `--batch_size`, `-b`: Batch size for inference (default: 32)
+
+**Output:**
+- Text file with accuracy metrics (`evaluation_results.txt`)
+- Visualization images per class showing:
+  - Top 10 correct predictions (by confidence)
+  - All wrong predictions with true and predicted labels
+  - Accuracy, wrong count, and total count displayed on each image
+
+**Metrics Calculated:**
+- Overall accuracy (with correct/wrong/total counts)
+- Per-class accuracy (with correct/wrong/total counts for each class)
 
 
 ## Contact
