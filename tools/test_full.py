@@ -390,7 +390,7 @@ def main():
     # Read input CSV
     print(f"[Info] Reading CSV from {args.input_csv}")
     try:
-        df = pd.read_csv_safe(args.input_csv, encoding='utf-8')
+        df = read_csv_safe(args.input_csv, encoding='utf-8')
     except Exception as e:
         print(f"[Error] Failed to read CSV: {e}")
         return
