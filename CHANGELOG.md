@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.11 - 2026/01/19 18:41 (smartadpole)
+Add category-based image saving and improve output file naming
+
+- 新增：`test_full.py` 中新增 `generate_saved_filename` 函数，根据视频名、帧号和帧类型生成保存的文件名（格式：`video_name帧号_frame_type.jpg`）
+- 新增：`test_full.py` 中新增 `--temp_save_dir` 命令行参数，支持按类别保存裁剪后的图片到指定目录
+- 新增：按类别保存功能支持自动创建类别子目录，文件名包含视频名、帧号和帧类型信息，便于后续分析和查看
+- 优化：`test_full.py` 中将 `--output_csv` 参数改为 `--suffix` 参数，自动根据输入 CSV 文件名生成输出文件名（格式：`{input_csv_basename}_{suffix}.csv`）
+- 优化：`test_full.py` 中 `collect_all_images` 函数返回 `row_data` 供后续文件名生成使用
+- 优化：`test_full.py` 中 `read_csv_auto` 函数添加文件存在性检查，提前发现文件不存在的情况
+- 优化：`test_full.py` 中 `--base_dir` 参数默认值改为输入 CSV 文件所在目录，简化使用
+- 新增：添加 `re` 和 `shutil` 模块导入，支持文件名处理和文件复制功能
+- 新增：添加 `utils.file.mkdir_simple` 导入，自动创建输出目录
+
 ## 0.1.10 - 2026/01/16 20:36 (smartadpole)
 Add security checks for label file and detailed logging for image cropping
 

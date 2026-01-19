@@ -16,6 +16,8 @@ test_full.py
 ├── 图片收集模块
 │   ├── collect_all_images()  # 批量收集和裁剪所有图片
 │   └── save_cropped_image()  # 保存裁剪后的临时图片
+├── 文件名生成模块
+│   └── generate_saved_filename()  # 根据视频名、帧号和帧类型生成保存的文件名
 ├── 可视化模块
 │   └── visualize_image_with_bbox()  # 在原始图片上绘制 bbox、标签和置信度
 ├── 推理模块（复用）
@@ -93,8 +95,8 @@ CSV 文件 → 读取所有行
 - 返回成功任务列表和失败任务列表，包含原始图片路径和 bbox 信息供可视化使用
 
 **输出：**
-- `tasks`: `List[Tuple[row_idx, field_prefix, temp_path, orig_img_path, bbox_str]]`
-- `failed_tasks`: `List[Tuple[row_idx, field_prefix]]`
+- `tasks`: `List[Tuple[row_idx, field_prefix, temp_path, orig_img_path, bbox_str, row_data]]`
+- `failed_tasks`: `List[Tuple[row_idx, field_prefix, reason]]`
 
 ### 4. 可视化功能 (`visualize_image_with_bbox`)
 
@@ -142,6 +144,49 @@ label_id class_name
 
 支持制表符或空格分隔。
 
+### 6. 文件名生成 (`generate_saved_filename`)
+
+**职责：** 根据视频名、帧号和帧类型生成保存的文件名
+
+**实现细节：**
+- 支持从多种可能的列名中自动识别视频名和帧号（优先级：参数指定 > 常见列名）
+- 视频名列名优先级：`video_name` > `video_path` > `video` > `vid_name` > `vid_path`
+- 帧号列名优先级：`event_frame` > `cross_frame` > `frame_number` > `frame_num` > `cross_line_frame` > `frame`
+- 自动提取视频文件名（如果视频名是路径，提取文件名部分）
+- 帧类型映射：
+  - `take_first` → `取走目标的第一帧`
+  - `take_cross` → `取走目标的过线帧`
+  - `return` → `放回目标的过线帧`
+  - `return_static` → `放回目标的静止帧`
+- 文件名格式：`{video_name}_{frame_number}_{frame_type}.jpg`
+- 自动清理文件名中的非法字符（`<>:"/\|?*`）
+
+**错误处理：**
+- 如果找不到视频名，使用 `unknown_video` 作为默认值
+- 如果找不到帧号，使用 `none` 作为默认值
+
+### 7. 按类别保存图片
+
+**职责：** 将裁剪后的图片按预测类别保存到指定目录
+
+**实现细节：**
+- 如果指定 `--temp_save_dir` 参数，会在该目录下创建以模型版本命名的子目录
+- 在每个版本目录下，按类别名称创建子目录
+- 使用 `generate_saved_filename` 生成文件名，包含视频名、帧号和帧类型信息
+- 从临时目录复制裁剪后的图片到对应的类别目录
+
+**目录结构：**
+```
+{temp_save_dir}/
+  └── {model_version}/
+      ├── {class_name_1}/
+      │   ├── video1_123_取走目标的第一帧.jpg
+      │   └── ...
+      ├── {class_name_2}/
+      │   └── ...
+      └── ...
+```
+
 ## 依赖关系
 
 ### 外部依赖
@@ -161,6 +206,7 @@ eval.classify_batch                # 批量推理
 eval.build_val_tfm                 # 图像变换管道
 test_dinov2_classification.load_label_file  # 类别名称加载
 utils.logger.logger_manager       # 日志管理
+utils.file.mkdir_simple           # 目录创建工具
 ```
 
 ## 接口规范
@@ -194,18 +240,34 @@ def crop_image_by_bbox(image_path: str, bbox_str: str, base_dir: str = None) -> 
     """
     pass
 
-def collect_all_images(df: pd.DataFrame, base_dir: str, temp_dir: str) -> Tuple[List, List]:
+def collect_all_images(df: pd.DataFrame, base_dir: str, temp_dir: str, visualize: bool = False) -> Tuple[List, List]:
     """收集所有需要处理的图片并批量裁剪
     
     Args:
         df: 输入 DataFrame
         base_dir: 图片基础目录
         temp_dir: 临时文件保存目录
+        visualize: 是否进行可视化（未使用，保留用于兼容性）
     
     Returns:
         (tasks, failed_tasks) 元组
-        tasks: List[Tuple[row_idx, field_prefix, temp_path, orig_img_path, bbox_str]]
-        failed_tasks: List[Tuple[row_idx, field_prefix]]
+        tasks: List[Tuple[row_idx, field_prefix, temp_path, orig_img_path, bbox_str, row_data]]
+        failed_tasks: List[Tuple[row_idx, field_prefix, reason]]
+    """
+    pass
+
+def generate_saved_filename(row: pd.Series, prefix: str, video_name_col: str = None, 
+                            cross_frame_col: str = None) -> str:
+    """根据视频名、帧号和帧类型生成保存的文件名
+    
+    Args:
+        row: pandas Series 包含行数据
+        prefix: 字段前缀（take_first, take_cross, return, return_static）
+        video_name_col: 视频名列名（可选，默认尝试常见列名）
+        cross_frame_col: 帧号列名（可选，默认尝试常见列名）
+    
+    Returns:
+        生成的文件名字符串（格式：video_name帧号_frame_type.jpg）
     """
     pass
 
@@ -231,13 +293,14 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confid
 
 ```bash
 --input_csv      # 输入 CSV 文件路径（必需）
---output_csv     # 输出 CSV 文件路径（必需）
+--suffix         # 输出 CSV 文件后缀名（可选，默认：label），输出文件名为 {input_csv_basename}_{suffix}.csv
 --model_path     # 模型检查点文件路径（必需）
 --label_file     # 类别名称映射文件路径（可选）
---base_dir       # 图片基础目录（可选，用于解析相对路径）
+--base_dir       # 图片基础目录（可选，默认：输入 CSV 文件所在目录）
 --device         # 推理设备：cuda 或 cpu（默认：cuda）
 --batch_size     # 批量推理大小（默认：32）
 --temp_dir       # 临时文件目录（默认：temp_cropped）
+--temp_save_dir  # 按类别保存裁剪图片的目录（可选）
 --visualize      # 是否进行可视化（默认：False）
 --vis_output_dir # 可视化图片输出目录（默认：visualizations，仅在 --visualize 启用时使用）
 ```
@@ -296,13 +359,20 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confid
    - 将推理结果映射回原始 DataFrame
    - 使用类别名称映射将类别ID转换为名称
    - 处理失败的任务（设置为 None）
+   - 如果指定 `--temp_save_dir`，按类别保存裁剪后的图片
 
-6. **可视化阶段**（可选）
+6. **按类别保存阶段**（可选）
+   - 如果启用 `--temp_save_dir` 参数，为每张成功分类的图片按类别保存
+   - 使用 `generate_saved_filename` 生成包含视频名、帧号和帧类型的文件名
+   - 从临时目录复制图片到对应的类别目录
+
+7. **可视化阶段**（可选）
    - 如果启用 `--visualize` 参数，为每张成功分类的图片生成可视化结果
    - 在原始图片上绘制 bbox、标签和置信度
    - 保存可视化图片到指定目录
 
-7. **输出阶段**
+8. **输出阶段**
+   - 根据 `--suffix` 参数自动生成输出 CSV 文件名（格式：`{input_csv_basename}_{suffix}.csv`）
    - 将结果保存到输出 CSV 文件
    - 使用 UTF-8-BOM 编码确保 Excel 正确显示中文
 
@@ -334,6 +404,25 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confid
 1. **兼容性：** `classify_batch` 函数接受文件路径列表，而不是 PIL Image 对象
 2. **调试：** 可以检查裁剪后的图片是否正确
 3. **灵活性：** 如果处理中断，可以从中断点继续
+
+### 为什么按类别保存图片？
+
+**决策：** 提供 `--temp_save_dir` 参数，支持按预测类别保存裁剪后的图片。
+
+**理由：**
+1. **数据分析：** 便于按类别查看和分析裁剪后的图片
+2. **质量检查：** 可以快速检查每个类别的预测结果是否正确
+3. **样本收集：** 可以收集每个类别的样本用于后续训练或分析
+4. **可追溯性：** 文件名包含视频名、帧号和帧类型信息，便于追溯原始数据
+
+### 为什么自动生成输出文件名？
+
+**决策：** 将 `--output_csv` 参数改为 `--suffix` 参数，自动根据输入文件名生成输出文件名。
+
+**理由：**
+1. **简化使用：** 用户只需指定后缀，无需手动构造输出文件名
+2. **避免错误：** 减少因手动输入路径错误导致的问题
+3. **一致性：** 输出文件名与输入文件名保持关联，便于识别
 
 ## 性能考虑
 

@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.10
+**Version:** 0.1.11
 
 ### Introduction
 ![method](Method.png)
@@ -253,15 +253,16 @@ python tools/test_full.py \
 
 **Required Parameters:**
 - `--input_csv`: Path to input CSV file containing image paths and bbox information
-- `--output_csv`: Path to output CSV file with classification results
 - `--model_path`: Path to model checkpoint (.pt file)
 
 **Optional Parameters:**
+- `--suffix`: Output CSV file suffix name (default: `label`). Output file will be `{input_csv_basename}_{suffix}.csv`
 - `--label_file`: Path to label file (.txt) with class names (optional)
-- `--base_dir`: Base directory for resolving relative image paths (default: current directory)
+- `--base_dir`: Base directory for resolving relative image paths (default: directory of input_csv)
 - `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
 - `--batch_size`, `-b`: Batch size for inference (default: 32)
 - `--temp_dir`: Temporary directory for saving cropped images (default: `temp_cropped`)
+- `--temp_save_dir`: Directory to save cropped images organized by category (optional)
 - `--visualize`: Enable visualization of images with bbox, label and confidence (default: False)
 - `--vis_output_dir`: Output directory for visualized images (default: `visualizations`, only used if `--visualize` is set)
 
@@ -280,6 +281,7 @@ Bbox format: normalized coordinates "x y w h" (space-separated, values in [0, 1]
   - `take_cross_image_label`, `take_cross_image_confidence`
   - `return_image_label`, `return_image_confidence`
   - `return_static_image_label`, `return_static_image_confidence`
+- If `--temp_save_dir` is specified, cropped images are saved organized by category (subdirectories named by class name)
 - If `--visualize` is enabled, visualization images are saved to the specified output directory
 
 **Visualization:**

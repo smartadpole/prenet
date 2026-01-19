@@ -18,12 +18,15 @@ if PARENT_DIR not in sys.path:
 import argparse
 import pandas as pd
 import torch
+import re
+import shutil
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 from eval import load_model, classify_batch, build_val_tfm
 from test_dinov2_classification import load_label_file
 import chardet
 from utils.logger import logger_manager
+from utils.file import mkdir_simple
 
 logger_manager.set_log_level(level="DEBUG")
 
@@ -414,6 +417,69 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confid
         return False
 
 
+def generate_saved_filename(row, prefix: str, video_name_col: str = None, cross_frame_col: str = None) -> str:
+    """
+    Generate filename for saved image based on video name, frame number, and frame type.
+    Format: video_name帧号_frame_type.jpg
+    
+    Args:
+        row: pandas Series containing row data
+        prefix: Field prefix (take_first, take_cross, return, return_static)
+        video_name_col: Column name for video name (default: try common names)
+        cross_frame_col: Column name for cross frame number (default: try common names)
+        
+    Returns:
+        Generated filename string
+    """
+    # Map prefix to Chinese frame type names
+    frame_type_map = {
+        'take_first': '取走目标的第一帧',
+        'take_cross': '取走目标的过线帧',
+        'return': '放回目标的过线帧',
+        'return_static': '放回目标的静止帧',
+    }
+    
+    # Get frame type name
+    frame_type = frame_type_map.get(prefix, prefix)
+    
+    # Try to get video name from various possible column names
+    # Priority: video_name_col parameter > video_name > other common names
+    video_name = "unknown_video"
+    if video_name_col and video_name_col in row.index:
+        video_name = str(row[video_name_col]).strip()
+    else:
+        # Try common column names, prioritize 'video_name' as per CSV schema
+        for col_name in ['video_name', 'video_path', 'video', 'vid_name', 'vid_path']:
+            if col_name in row.index and not pd.isna(row[col_name]):
+                video_name = str(row[col_name]).strip()
+                # Extract filename without extension if it's a path
+                if os.path.sep in video_name:
+                    video_name = os.path.splitext(os.path.basename(video_name))[0]
+                break
+    
+    # Try to get frame number from various possible column names
+    # Priority: cross_frame_col parameter > event_frame > other common names
+    frame_number = "none"
+    if cross_frame_col and cross_frame_col in row.index:
+        frame_number = str(row[cross_frame_col]).strip()
+    else:
+        # Try common column names, prioritize 'event_frame' as per CSV schema
+        for col_name in ['event_frame', 'cross_frame', 'frame_number', 'frame_num', 'cross_line_frame', 'frame']:
+            if col_name in row.index and not pd.isna(row[col_name]):
+                frame_number = str(int(row[col_name])) if pd.api.types.is_number(row[col_name]) else str(row[col_name]).strip()
+                break
+    
+    # Generate filename: video_name帧号_frame_type.jpg
+    filename = f"{video_name}_{frame_number}_{frame_type}.jpg"
+    
+    # Sanitize filename (remove invalid characters)
+    invalid_chars = '<>:"/\\|?*'
+    for char in invalid_chars:
+        filename = filename.replace(char, '_')
+    
+    return filename
+
+
 def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False):
     """
     Collect all images that need to be cropped and classified from the dataframe.
@@ -422,9 +488,10 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
         df: pandas DataFrame
         base_dir: Base directory for resolving image paths
         temp_dir: Temporary directory for saving cropped images
+        visualize: Whether to visualize images (unused, kept for compatibility)
         
     Returns:
-        tasks: List of tuples (row_idx, field_prefix, temp_path, orig_img_path, bbox_str) for successful crops
+        tasks: List of tuples (row_idx, field_prefix, temp_path, orig_img_path, bbox_str, row_data) for successful crops
         failed_tasks: List of tuples (row_idx, field_prefix, reason) for failed crops
     """
     tasks = []
@@ -496,7 +563,8 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
             temp_filename = f"row_{row_idx}_{prefix}_{os.path.basename(str(img_name))}"
             temp_path = os.path.join(temp_dir, temp_filename)
             if save_cropped_image(cropped_img, temp_path):
-                tasks.append((row_idx, prefix, temp_path, orig_img_path, bbox_str))
+                # Store row data for later use in filename generation
+                tasks.append((row_idx, prefix, temp_path, orig_img_path, bbox_str, row))
             else:
                 failure_stats['save_error'] += 1
                 failed_tasks.append((row_idx, prefix, 'save_error'))
@@ -538,6 +606,11 @@ def read_csv_auto(
     kwargs.pop("encoding", None)
 
     try:
+        if not os.path.isfile(path):
+            print("CSV file does not exist: {}".format(path), level="error")
+            exit(0)
+
+        print(f"[Info] Reading CSV from {path}")
         with open(path, "rb") as f:
             raw = f.read(sample_size)
         detected = chardet.detect(raw)
@@ -565,15 +638,15 @@ def main():
     )
     parser.add_argument("--input_csv", type=str, required=True,
                         help="Input CSV file path")
-    parser.add_argument("--output_csv", type=str, required=True,
-                        help="Output CSV file path")
+    parser.add_argument("--suffix", type=str, default='label',
+                        help="Output CSV file suffix name, default is label")
     parser.add_argument("--model_path", type=str, required=True,
                         help="Path to model checkpoint (.pt file)")
     parser.add_argument("--label_file", type=str, default=None,
                         help="Path to label file. Format: label_id class_name (one per line). "
                              "If not provided, will use Class_{id} as fallback")
     parser.add_argument("--base_dir", type=str, default="",
-                        help="Base directory for resolving relative image paths")
+                        help="Base directory for resolving relative image paths, default is the directory of input_csv")
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"],
                         help="Device to run inference on")
     parser.add_argument("--batch_size", "-b", type=int, default=32,
@@ -584,6 +657,8 @@ def main():
                         help="Whether to visualize images with bbox, label and confidence")
     parser.add_argument("--vis_output_dir", type=str, default="visualizations",
                         help="Output directory for visualized images (only used if --visualize is set)")
+    parser.add_argument("--temp_save_dir", type=str,
+                        help="Directory to save cropped images organized by category")
     args = parser.parse_args()
     
     # Setup device
@@ -604,7 +679,6 @@ def main():
     transform = build_val_tfm(img_size)
     
     # Read input CSV
-    print(f"[Info] Reading CSV from {args.input_csv}")
     try:
         df = read_csv_auto(args.input_csv)
     except Exception as e:
@@ -658,21 +732,49 @@ def main():
     ]
     for col in result_columns:
         df[col] = None
+
+
+    output_csv = os.path.splitext(args.input_csv)[0] + f"_{args.suffix}.csv"
+    mkdir_simple(output_csv)
     
     # Map successful results (using class names instead of IDs)
+    # Also save images by category if requested
+    version = os.path.basename(os.path.dirname(args.model_path))
+    if args.temp_save_dir:
+        temp_save_dir = os.path.join(args.temp_save_dir, version)
+        os.makedirs(temp_save_dir, exist_ok=True)
+        print(f"[Info] Saving cropped images by category to {args.temp_save_dir}...")
+    
     for task, (pred_class, confidence) in zip(tasks, all_results):
-        row_idx, prefix, _, orig_img_path, bbox_str = task
+        row_idx, prefix, temp_path, orig_img_path, bbox_str, row_data = task
         if pred_class is not None:
             # Get class name from mapping, fallback to Class_{id} if not found
             class_name = classes[pred_class]
             df.at[row_idx, f'{prefix}_image_label'] = class_name
             df.at[row_idx, f'{prefix}_image_confidence'] = float(confidence)
+            
+            # Save image by category if requested
+            if args.temp_save_dir:
+                try:
+                    # Create category directory
+                    category_dir = os.path.join(temp_save_dir, class_name)
+                    os.makedirs(category_dir, exist_ok=True)
+                    
+                    # Generate filename with video name, cross frame, and frame attributes
+                    saved_filename = generate_saved_filename(row_data, prefix)
+                    saved_path = os.path.join(category_dir, saved_filename)
+                    
+                    # Copy the cropped image to the category directory
+                    if os.path.exists(temp_path):
+                        shutil.copy2(temp_path, saved_path)
+                except Exception as e:
+                    print(f"[Warning] Failed to save image by category: {e}", level="warning")
 
     # Save output CSV
-    print(f"[Info] Saving results to {args.output_csv}")
+    print(f"[Info] Saving results to {output_csv}")
     try:
-        df.to_csv(args.output_csv, index=False, encoding='utf-8-sig')
-        print(f"[Info] Successfully saved {len(df)} rows to {args.output_csv}")
+        df.to_csv(output_csv, index=False, encoding='utf-8-sig')
+        print(f"[Info] Successfully saved {len(df)} rows to {output_csv}")
     except Exception as e:
         print(f"[Error] Failed to save CSV: {e}")
         return
