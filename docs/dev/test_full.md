@@ -49,12 +49,21 @@ CSV 文件 → 读取所有行
 **职责：** 将归一化的 bbox 字符串转换为像素坐标
 
 **输入格式：**
-- `bbox_str`: 归一化坐标字符串，格式为 "x y w h"（空格分隔）
+- `bbox_str`: 归一化坐标字符串，格式为 "cx cy w h"（空格分隔，中心点坐标+宽高）
 - 坐标值范围：[0, 1]，表示相对于图片尺寸的比例
+- `cx, cy`: 中心点坐标（归一化）
+- `w, h`: 宽度和高度（归一化）
 
 **实现细节：**
 - 支持空格分隔的 4 个浮点数
-- 转换为像素坐标：`x_pixel = x_norm * img_width`
+- 转换为像素坐标：
+  - `cx_pixel = cx_norm * img_width`
+  - `cy_pixel = cy_norm * img_height`
+  - `w_pixel = w_norm * img_width`
+  - `h_pixel = h_norm * img_height`
+- 将中心点转换为左上角坐标：
+  - `x = cx - w / 2`
+  - `y = cy - h / 2`
 - 边界检查：确保 bbox 在图片范围内
 - 最小尺寸保证：宽度和高度至少为 1 像素
 
@@ -100,15 +109,17 @@ CSV 文件 → 读取所有行
 
 ### 4. 可视化功能 (`visualize_image_with_bbox`)
 
-**职责：** 在原始图片上绘制 bbox、标签和置信度信息，并保存为可视化图片
+**职责：** 在原始图片上绘制 bbox、标签和置信度信息，并实时显示图像
 
 **实现细节：**
-- 加载原始图片并解析 bbox 坐标
+- 加载原始图片并解析 bbox 坐标（支持中心点+宽高格式）
 - 使用 PIL ImageDraw 在图片上绘制红色边界框
-- 在 bbox 附近显示标签文本和置信度（格式：`label: confidence`）
+- 可选显示标签文本和置信度（格式：`label: confidence`）
 - 自动调整字体大小和文本位置，确保文本在图片范围内
 - 支持跨平台字体加载（Windows/Linux/macOS）
 - 兼容不同版本的 PIL（支持 textbbox 和 textsize 方法）
+- 图像显示前自动缩放超过 1080p（1920x1080）分辨率的图像，保持宽高比
+- 使用 matplotlib 实时显示图像（非阻塞模式）
 
 **字体加载策略：**
 - Windows: 尝试加载 Arial、Microsoft YaHei 等系统字体
@@ -116,14 +127,21 @@ CSV 文件 → 读取所有行
 - macOS: 尝试加载 Helvetica、Arial 等字体
 - 如果系统字体不可用，回退到默认字体
 
+**图像显示优化：**
+- 超过 1080p 的图像自动缩放到 1080p 以内，保持宽高比
+- 使用 LANCZOS 重采样保证缩放质量
+- 兼容新旧版本的 PIL（自动回退到 `Image.LANCZOS`）
+- 使用 matplotlib 非阻塞模式显示，每张图像显示 0.1 秒后自动关闭
+- 抑制 matplotlib 字体查找相关的警告日志
+
 **可视化效果：**
 - 红色边界框（bbox）
-- 黑色背景的白色文本标签
+- 黑色背景的白色文本标签（可选）
 - 文本显示格式：`类别名称: 置信度`（置信度保留 3 位小数）
 
-**输出：**
-- 可视化图片保存到指定目录
-- 文件命名格式：`row_{row_idx}_{prefix}_{原文件名}_vis.jpg`
+**使用场景：**
+- **加载阶段**：只显示图像和检测框（`show_label=False`），用于检查 bbox 是否正确
+- **测评阶段**：显示图像、检测框、标签和置信度（`show_label=True`），用于查看分类结果
 
 ### 5. 类别名称映射
 
@@ -218,12 +236,12 @@ def parse_bbox(bbox_str: str, img_width: int, img_height: int) -> Optional[Tuple
     """解析归一化 bbox 字符串为像素坐标
     
     Args:
-        bbox_str: 归一化坐标字符串 "x y w h"
+        bbox_str: 归一化坐标字符串 "cx cy w h"（中心点坐标+宽高）
         img_width: 图片宽度（像素）
         img_height: 图片高度（像素）
     
     Returns:
-        (x, y, w, h) 像素坐标元组，或 None 如果解析失败
+        (x, y, w, h) 像素坐标元组（左上角坐标+宽高），或 None 如果解析失败
     """
     pass
 
@@ -271,20 +289,21 @@ def generate_saved_filename(row: pd.Series, prefix: str, video_name_col: str = N
     """
     pass
 
-def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confidence: float, 
-                               output_path: str, base_dir: str = None) -> bool:
-    """在原始图片上绘制 bbox、标签和置信度并保存
+def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None, confidence: float = None,
+                               base_dir: str = None, show_label: bool = True, display: bool = True) -> Optional[Image.Image]:
+    """在原始图片上绘制 bbox、标签和置信度，并实时显示图像
     
     Args:
         image_path: 原始图片路径（相对或绝对）
-        bbox_str: 归一化 bbox 字符串 "x y w h"
-        label: 预测的类别名称
-        confidence: 预测置信度
-        output_path: 可视化图片保存路径
+        bbox_str: 归一化 bbox 字符串 "cx cy w h"（中心点坐标+宽高）
+        label: 预测的类别名称（可选，仅在 show_label=True 时使用）
+        confidence: 预测置信度（可选，仅在 show_label=True 时使用）
         base_dir: 基础目录，用于解析相对路径
+        show_label: 是否显示标签和置信度文本（默认：True）
+        display: 是否使用 matplotlib 实时显示图像（默认：True）
     
     Returns:
-        True 如果成功，False 如果失败
+        PIL Image 对象（已绘制 bbox 和文本），或 None 如果失败
     """
     pass
 ```
@@ -301,21 +320,20 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confid
 --batch_size     # 批量推理大小（默认：32）
 --temp_dir       # 临时文件目录（默认：temp_cropped）
 --temp_save_dir  # 按类别保存裁剪图片的目录（可选）
---visualize      # 是否进行可视化（默认：False）
---vis_output_dir # 可视化图片输出目录（默认：visualizations，仅在 --visualize 启用时使用）
+--visualize      # 是否进行可视化（默认：False）。启用后会在加载阶段和测评阶段实时显示图像
 ```
 
 ### 输入 CSV 格式
 
 **必需列：**
 - `take_first_image_name`: 取走目标的第一帧图片路径
-- `take_first_bbox`: 第一帧的 bbox（格式：x y w h）
+- `take_first_bbox`: 第一帧的 bbox（格式：cx cy w h，中心点坐标+宽高）
 - `take_cross_image_name`: 取走目标的过线帧图片路径
-- `take_cross_bbox`: 过线帧的 bbox
+- `take_cross_bbox`: 过线帧的 bbox（格式：cx cy w h）
 - `return_image_name`: 放回目标的过线帧图片路径
-- `return_bbox`: 放回过线帧的 bbox
+- `return_bbox`: 放回过线帧的 bbox（格式：cx cy w h）
 - `return_static_image_name`: 放回目标的静止帧图片路径
-- `return_static_bbox`: 静止帧的 bbox
+- `return_static_bbox`: 静止帧的 bbox（格式：cx cy w h）
 
 **其他列：** 保留在输出 CSV 中
 
@@ -367,9 +385,11 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confid
    - 从临时目录复制图片到对应的类别目录
 
 7. **可视化阶段**（可选）
-   - 如果启用 `--visualize` 参数，为每张成功分类的图片生成可视化结果
-   - 在原始图片上绘制 bbox、标签和置信度
-   - 保存可视化图片到指定目录
+   - 如果启用 `--visualize` 参数，在加载阶段和测评阶段实时显示可视化结果
+   - **加载阶段**：实时显示每一帧的大图，绘制检测框（不显示 label 和置信度）
+   - **测评阶段**：实时显示每一帧的大图，绘制检测框、label 名字和置信度
+   - 超过 1080p 的图像自动缩放到 1080p 以内显示
+   - 使用 matplotlib 非阻塞模式，每张图像显示 0.1 秒后自动关闭
 
 8. **输出阶段**
    - 根据 `--suffix` 参数自动生成输出 CSV 文件名（格式：`{input_csv_basename}_{suffix}.csv`）
@@ -448,7 +468,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str, confid
 
 1. **临时文件占用：** 处理大量图片时，临时目录可能占用大量磁盘空间
 2. **路径解析：** 相对路径解析依赖于 `base_dir` 参数，如果路径格式不一致可能导致失败
-3. **bbox 格式：** 仅支持归一化坐标格式，不支持像素坐标格式
+3. **bbox 格式：** 仅支持归一化坐标格式（中心点+宽高：cx cy w h），不支持像素坐标格式
 4. **错误恢复：** 如果处理中断，需要重新运行整个流程
 
 ## 未来改进方向

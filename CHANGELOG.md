@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.12 - 2026/01/19 19:41 (smartadpole)
+Enable real-time visualization and fix bbox parsing format
+
+- 新增：`test_full.py` 中开启 `visualize_image_with_bbox` 功能，支持实时显示图像和检测框
+- 新增：加载阶段可视化功能，实时显示每一帧的大图并绘制检测框（不显示 label 和置信度）
+- 新增：测评阶段可视化功能，实时显示每一帧的大图，绘制检测框、label 名字和置信度
+- 修复：`parse_bbox` 函数修正 bbox 解析格式，从左上角坐标+宽高改为中心点坐标+宽高（格式：cx cy w h）
+- 优化：`visualize_image_with_bbox` 函数添加图像显示功能，使用 matplotlib 实时显示图像
+- 优化：图像显示时自动缩放超过 1080p（1920x1080）分辨率的图像，保持宽高比
+- 优化：使用 warnings 模块和 matplotlib 配置抑制字体查找相关的警告日志
+- 优化：图像显示使用非阻塞模式，每张图像显示 0.1 秒后自动关闭
+- 优化：添加 PIL 版本兼容性处理，支持新旧版本的图像重采样方法
+
 ## 0.1.11 - 2026/01/19 18:41 (smartadpole)
 Add category-based image saving and improve output file naming
 

@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.11
+**Version:** 0.1.12
 
 ### Introduction
 ![method](Method.png)
@@ -273,7 +273,7 @@ The CSV file should contain the following columns:
 - `return_image_name`, `return_bbox`: Return crossing frame image path and bbox
 - `return_static_image_name`, `return_static_bbox`: Return static frame image path and bbox
 
-Bbox format: normalized coordinates "x y w h" (space-separated, values in [0, 1])
+Bbox format: normalized coordinates "cx cy w h" (space-separated, center point + width/height, values in [0, 1])
 
 **Output:**
 - CSV file with 8 additional columns containing classification results:
