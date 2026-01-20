@@ -879,9 +879,9 @@ def main():
         return
 
     # Cleanup temp directory (optional)
-    # import shutil
-    # shutil.rmtree(args.temp_dir)
-    # print(f"[Info] Cleaned up temporary directory {args.temp_dir}")
+    import shutil
+    shutil.rmtree(args.temp_dir)
+    print(f"[Info] Cleaned up temporary directory {args.temp_dir}")
 
     print("[Info] Processing completed!")
 
