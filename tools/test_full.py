@@ -210,7 +210,7 @@ def parse_bbox(bbox_str: str, img_width: int, img_height: int):
         # Validate normalized coordinates
         if not (0 <= cx_norm <= 1 and 0 <= cy_norm <= 1 and 0 <= w_norm <= 1 and 0 <= h_norm <= 1):
             print(f"[ParseBbox] Bbox values out of range [0,1]: cx={cx_norm}, cy={cy_norm}, w={w_norm}, h={h_norm}",
-                  level="debug")
+                  level="warning")
 
         # Convert normalized coordinates to pixel coordinates
         cx = cx_norm * img_width  # Center x in pixels
@@ -230,7 +230,7 @@ def parse_bbox(bbox_str: str, img_width: int, img_height: int):
 
         return (x, y, w, h)
     except (ValueError, IndexError) as e:
-        print(f"[ParseBbox] Failed to parse bbox '{bbox_str}': {e}", level="debug")
+        print(f"[ParseBbox] Failed to parse bbox '{bbox_str}': {e}", level="warning")
         return None
 
 
@@ -254,7 +254,7 @@ def load_image(image_path: str, base_dir: str = None):
     try:
         img = Image.open(img_path).convert('RGB')
     except Exception as e:
-        print(f"[LoadImage] Failed to load image {img_path}: {e}", level="debug")
+        print(f"[LoadImage] Failed to load image {img_path}: {e}", level="warning")
         return None
 
     return img
@@ -302,7 +302,7 @@ def save_cropped_image(cropped_img: Image.Image, output_path: str):
         cropped_img.save(output_path)
         return True
     except Exception as e:
-        print(f"[SaveImage] Failed to save cropped image to {output_path}: {e}", level="debug")
+        print(f"[SaveImage] Failed to save cropped image to {output_path}: {e}", level="warning")
         return False
 
 
@@ -475,7 +475,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 
                 # Check if image is valid
                 if img_array.size == 0:
-                    print(f"[Warning] Empty image array for {img_path}", level="warning")
+                    print(f"Empty image array for {img_path}", level="warning")
                     return img_draw
 
                 fig = plt.figure(figsize=(12, 8))
@@ -487,12 +487,12 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
                 plt.pause(0.1)  # Brief pause to allow display update
                 plt.close(fig)  # Close specific figure to prevent blank windows
             except Exception as e:
-                print(f"[Warning] Failed to display image: {e}", level="warning")
+                print(f"Failed to display image: {e}", level="warning")
 
         return img_draw
 
     except Exception as e:
-        print(f"[Warning] Failed to visualize image {image_path}: {e}", level="warning")
+        print(f"Failed to visualize image {image_path}: {e}", level="warning")
         return None
 
 
@@ -707,7 +707,7 @@ def read_csv_auto(
                 e for e in encodings if e != detected["encoding"]
             )
     except Exception as e:
-        print(f"Encoding detection failed: {e}", level="warning")
+        print(f"Encoding detection failed: {e}", level="error")
 
     last_err = None
     for enc in encodings:
@@ -775,7 +775,7 @@ def main():
     try:
         df = read_csv_auto(args.input_csv)
     except Exception as e:
-        print(f"[Error] Failed to read CSV: {e}")
+        print(f"Failed to read CSV: {e}", level="error")
         return
 
     print(f"[Info] Loaded {len(df)} rows from CSV")
@@ -828,7 +828,7 @@ def main():
     # Map successful results (using class names instead of IDs)
     # Also save images by category if requested
     if args.temp_save_dir:
-        temp_save_dir = os.path.join(args.temp_save_dir, category, version)
+        temp_save_dir = os.path.join(args.temp_save_dir, version, category)
         os.makedirs(temp_save_dir, exist_ok=True)
         print(f"[Info] Saving cropped images by category to {args.temp_save_dir}...")
 
@@ -867,15 +867,19 @@ def main():
                     if os.path.exists(temp_path):
                         shutil.copy2(temp_path, saved_path)
                 except Exception as e:
-                    print(f"[Warning] Failed to save image by category: {e}", level="warning")
+                    print(f"Failed to save image by category: {e}", level="warning")
 
     # Save output CSV
     print(f"[Info] Saving results to {output_csv}")
     try:
         df.to_csv(output_csv, index=False, encoding='utf-8-sig')
         print(f"[Info] Successfully saved {len(df)} rows to {output_csv}")
+        if args.temp_save_dir:
+            temp_csv = os.path.join(temp_save_dir, os.path.basename(output_csv))
+            shutil.copy2(output_csv, temp_csv)
+            print(f"save output CSV to {temp_csv}")
     except Exception as e:
-        print(f"[Error] Failed to save CSV: {e}")
+        print(f"Failed to save CSV: {e}", level="error")
         return
 
     # Cleanup temp directory (optional)
