@@ -756,6 +756,10 @@ def main():
         device = "cpu"
         print("[Warning] CUDA not available, using CPU")
 
+    version = os.path.basename(os.path.dirname(args.model_path))
+    category = os.path.basename(os.path.dirname(args.input_csv))
+    print(f"-> Version: {version}, Category: {category}", level="info")
+
     # Load class names mapping
     classes = load_label_file(args.label_file)
 
@@ -823,9 +827,8 @@ def main():
 
     # Map successful results (using class names instead of IDs)
     # Also save images by category if requested
-    version = os.path.basename(os.path.dirname(args.model_path))
     if args.temp_save_dir:
-        temp_save_dir = os.path.join(args.temp_save_dir, version)
+        temp_save_dir = os.path.join(args.temp_save_dir, category, version)
         os.makedirs(temp_save_dir, exist_ok=True)
         print(f"[Info] Saving cropped images by category to {args.temp_save_dir}...")
 
