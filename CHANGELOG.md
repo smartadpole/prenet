@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.13 - 2026/01/23 13:52 (smartadpole)
+Optimize training data augmentation for fine-grained classification tasks
+
+- 优化：`train_dinov2_arcface_small.py` 中 `build_train_tfm` 函数收敛数据增强参数，适配细粒度分类任务（依赖细微纹理和精准色调）
+- 优化：ColorJitter 参数收敛，hue 从 0.1 降至 0.01（几乎锁定色相，保护颜色关键特征），saturation 从 0.4 降至 0.2（减少饱和度差异，避免掩盖肉质特征）
+- 优化：GaussianBlur sigma 上限从 4.0 降至 1.5（轻微起雾而非完全失焦，保护纹理细节）
+- 优化：RandomAffine 去除错切（shear=0），防止纹理非物理拉伸，degrees 从 20 降至 15，translate 从 0.15 降至 0.1，scale 从 (0.8, 1.2) 收敛至 (0.9, 1.1)
+- 优化：RandomPerspective distortion_scale 从 0.3 降至 0.1，p 从 0.5 降至 0.3（仅模拟轻微视角变化）
+- 优化：RandomResizedCrop scale 从 (0.5, 1.2) 收敛至 (0.8, 1.0)，ratio 从 (0.75, 1.33) 收敛至 (0.9, 1.1)，保留更多上下文特征
+- 新增：添加 RandomVerticalFlip（p=0.5），增加数据量（肉类纹理通常没有上下之分）
+- 优化：RandomJPEG p 从 0.4 降至 0.2，qmin 从 30 提升至 50，qmax 从 80 提升至 95（降低压缩失真概率，保留纹理）
+- 优化：RandomErasing 仅保留一个，p 从 0.4 降至 0.3，scale 从 (0.02, 0.25) 收敛至 (0.02, 0.1)，减小遮挡面积，防止遮住关键纹理
+- 移除：删除第二个 RandomErasing（结构化遮挡），避免过度遮挡关键纹理区域
+
 ## 0.1.12 - 2026/01/19 19:41 (smartadpole)
 Enable real-time visualization and fix bbox parsing format
 

@@ -45,60 +45,61 @@ def make_divisible(value: int, divisor: int):
 
 def build_train_tfm(img_size: int):
     """
-    升级后的训练集数据增强：
-    1. 仿射与透视：模拟视角变换与随机摆放
-    2. 模糊与色调：模拟烟雾、水雾及复杂光照
-    3. 多重擦除：模拟手部、异物遮挡
+    Fine-grained classification optimized data augmentation:
+    1. Conservative geometric transforms to preserve texture details
+    2. Minimal color jitter to preserve color-critical features
+    3. Light blur to simulate smoke without destroying texture
+    4. Reduced occlusion to protect key texture regions
     """
     normalize = transforms.Normalize((0.485, 0.456, 0.406),
                                      (0.229, 0.224, 0.225))
 
     return transforms.Compose([
-        # 基础裁剪与尺寸对齐
+        # Basic crop and resize
         CenterSquareCrop(),
         transforms.Resize(img_size, interpolation=transforms.InterpolationMode.BICUBIC),
 
-        # --- 视角与摆放增强 ---
-        # 随机裁剪缩放，增加尺度不变性
-        transforms.RandomResizedCrop(img_size, scale=(0.5, 1.2), ratio=(0.75, 1.33)),
-        # 随机水平翻转
+        # --- Viewpoint and placement augmentation (conservative) ---
+        # Increase minimum scale to preserve more context features
+        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
+        # Horizontal flip
         transforms.RandomHorizontalFlip(p=0.5),
-        # 仿射变换：包含旋转（-20~20度）、平移（上下左右15%）、缩放（0.8~1.2）、错切（-10~10度）
+        # Vertical flip: meat texture usually has no up-down distinction
+        transforms.RandomVerticalFlip(p=0.5),
+        # Affine transform: remove shear, reduce deformation magnitude
         transforms.RandomAffine(
-            degrees=20,
-            translate=(0.15, 0.15),
-            scale=(0.8, 1.2),
-            shear=10,
-            fill=127 # 填充灰色背景
+            degrees=15,             # Moderate rotation
+            translate=(0.1, 0.1),   # Moderate translation
+            scale=(0.9, 1.1),       # Converged scale range
+            shear=0,                # Disable shear to prevent non-physical texture stretching
+            fill=127
         ),
-        # 透视变换：模拟摄像头倾斜视角，扭曲程度0.3
-        transforms.RandomPerspective(distortion_scale=0.3, p=0.5, fill=127),
+        # Perspective transform: significantly reduced, only simulate slight viewpoint changes
+        transforms.RandomPerspective(distortion_scale=0.1, p=0.3, fill=127),
 
-        # --- 烟雾与环境干扰 ---
-        # 随机JPEG压缩失真
-        RandomJPEG(p=0.4, qmin=30, qmax=80),
-        # 色彩抖动：大幅改变亮度、对比度、饱和度，模拟光线变化
-        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
-        # 模拟烟雾/朦胧感：通过大核高斯模糊实现
-        transforms.RandomApply([transforms.GaussianBlur(kernel_size=(7, 11), sigma=(0.1, 4.0))], p=0.3),
-        # 随机灰度化：模拟极低光照下的红外监控模式
-        # transforms.RandomGrayscale(p=0.1),
+        # --- Smoke and environmental interference (fine-grained optimized) ---
+        # Reduce compression distortion probability to preserve texture
+        RandomJPEG(p=0.2, qmin=50, qmax=95),
+        # Color jitter: strictly lock hue, moderately adjust brightness and contrast for exposure simulation
+        transforms.ColorJitter(
+            brightness=0.3,  # Simulate exposure changes
+            contrast=0.3,    # Simulate contrast reduction due to smoke
+            saturation=0.2,  # Slight change, not too large
+            hue=0.01         # Almost lock hue, as color is critical for classification
+        ),
+        # Simulate smoke: significantly reduce blur radius, only "slight haze"
+        transforms.RandomApply([
+            transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 1.5))
+        ], p=0.3),
 
-        # --- 张量化与遮挡处理 ---
+        # --- Tensorization and occlusion handling ---
         transforms.ToTensor(),
-        # 模拟手部或较大物体遮挡（随机噪点块）
-        transforms.RandomErasing(
-            p=0.4,
-            scale=(0.02, 0.25),
-            ratio=(0.3, 3.3),
-            value="random"
-        ),
-        # 模拟结构化遮挡（黑色或深色实心块，模仿手、衣服边角）
+        # Occlusion handling: reduce occlusion area to prevent covering key textures
         transforms.RandomErasing(
             p=0.3,
-            scale=(0.05, 0.15),
-            ratio=(0.5, 2.0),
-            value=0
+            scale=(0.02, 0.1),  # Reduce maximum occlusion ratio
+            ratio=(0.3, 3.3),
+            value="random"
         ),
 
         normalize,
