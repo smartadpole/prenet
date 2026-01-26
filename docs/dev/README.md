@@ -38,6 +38,13 @@ This directory contains technical documentation for developers and maintainers o
   - Category-based image saving
   - Visualization features
 
+- **[Open-Set Recognition Evaluation](eval_open_set.md)**
+  - Open-set recognition evaluator documentation
+  - Offline feature gallery construction
+  - Top-K nearest neighbor search
+  - Weighted voting mechanism
+  - Open-set rejection logic
+
 ## Documentation Standards
 
 All developer documentation follows the **Five Pillars** structure:
@@ -77,6 +84,7 @@ All developer documentation follows the **Five Pillars** structure:
 ### For Testing
 1. [DINOv2 Classification Testing](test_dinov2_classification.md) for single image classification
 2. [Full Pipeline Testing](test_full.md) for batch CSV processing
+3. [Open-Set Recognition Evaluation](eval_open_set.md) for open-set recognition with offline feature gallery
 
 ### For Maintenance
 - All documents include design rationale sections explaining "why"
@@ -85,9 +93,9 @@ All developer documentation follows the **Five Pillars** structure:
 
 ## Version Information
 
-- **Current Version**: 0.1.13
-- **Last Updated**: 2026/01/23
-- **Key Changes**: Fine-grained classification optimized data augmentation
+- **Current Version**: 0.1.14
+- **Last Updated**: 2026/01/26
+- **Key Changes**: Implement open-set recognition evaluator with offline feature gallery
 
 ## Contributing
 

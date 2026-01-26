@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.13
+**Version:** 0.1.14
 
 ### Introduction
 ![method](Method.png)
@@ -238,6 +238,56 @@ Example:
 **Metrics Calculated:**
 - Overall accuracy (with correct/wrong/total counts)
 - Per-class accuracy (with correct/wrong/total counts for each class)
+
+### DINOv2 Open-Set Recognition Evaluation
+
+To evaluate model with open-set recognition using offline feature gallery:
+
+```bash
+python tools/eval_open.py \
+    --model_path <checkpoint_path> \
+    --template_file <template_file> \
+    --test_file <test_file> \
+    [OPTIONS]
+```
+
+**Required Parameters:**
+- `--model_path`: Path to model checkpoint (.pt file)
+- `--template_file`: Path to template file (.txt) for building feature gallery
+- `--test_file`: Path to test file (.txt) with ground truth labels
+
+**File Format:**
+Both template and test files should contain three columns per line (space or tab separated):
+```
+<absolute_image_path> <label_id> <class_name>
+```
+
+**Optional Parameters:**
+- `--output_dir`: Output directory for results (default: `eval_open_output`)
+- `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
+- `--top_k`: Number of nearest neighbors for voting (default: 5)
+- `--threshold`: Absolute similarity threshold for open-set rejection (default: 0.6)
+- `--margin_threshold`: Margin threshold between top-1 and top-2 scores (default: 0.1)
+- `--outlier_threshold`: Outlier removal threshold in standard deviations (default: 2.0)
+
+**Features:**
+- Offline feature gallery construction from template images
+- Top-K nearest neighbor search with weighted voting
+- Class imbalance handling using size normalization
+- Dual-threshold open-set rejection (absolute + relative)
+- Unknown class detection and statistics
+
+**Output:**
+- Text file with detailed evaluation results (`open_set_results.txt`)
+- Overall accuracy and per-class accuracy statistics
+- Unknown class detection count
+- Individual sample results with confidence scores
+
+**Key Differences from Closed-Set Evaluation:**
+- Uses metric learning instead of classification head
+- Supports dynamic class addition without retraining
+- Can identify "unknown" classes not in the gallery
+- Handles class imbalance through weighted voting
 
 ### CSV Batch Inference with Bbox Cropping
 

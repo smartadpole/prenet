@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.14 - 2026/01/26 16:46 (smartadpole)
+Implement open-set recognition evaluator with offline feature gallery
+
+- 新增：创建 `tools/eval_open.py` 开集识别评估脚本，支持基于离线特征库的度量学习识别方案
+- 新增：实现 `OpenSetEvaluator` 类，包含特征库构建、开集识别和评估功能
+- 新增：特征库构建功能（`build_gallery`），从模板图提取特征并支持离群点清洗
+- 新增：开集识别功能（`identify`），使用 Top-K 最近邻检索和加权投票机制
+- 新增：加权投票机制（`_weighted_voting`），结合相似度、排名权重和类别大小归一化，处理类别模板不均衡问题
+- 新增：离群点清洗功能（`_remove_outliers`），基于距离统计过滤异常模板特征
+- 新增：双阈值开集判定逻辑，支持绝对阈值和相对增益阈值（margin threshold）判定未知类
+- 新增：评估结果统计功能，包含总体准确率、分类别准确率和未知类判定数量
+- 新增：命令行参数支持，包括 `--template_file`、`--threshold`、`--top_k`、`--margin_threshold`、`--outlier_threshold` 等配置选项
+- 优化：复用 `tools/eval.py` 中的 `load_test_file` 和 `calculate_metrics` 函数，保持代码一致性
+- 优化：复用 `train_dinov2_arcface_small.py` 中的 `DinoV2Embedder` 和 `build_val_tfm`，确保特征提取一致性
+
 ## 0.1.13 - 2026/01/23 13:52 (smartadpole)
 Optimize training data augmentation for fine-grained classification tasks
 
