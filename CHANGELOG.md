@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.15 - 2026/01/26 18:32 (smartadpole)
+Implement template library generation using fastdup clustering-based sampling
+
+- 新增：创建 `tools/gen_sku.py` 模板库生成脚本，支持基于 fastdup 聚类的多样性采样方案
+- 新增：实现 `method2_template_sampling` 函数，采用聚类中心采样法，从每个簇中提取距离中心最近的图片作为模板
+- 新增：实现 `method2_hybrid_sampling` 函数，支持混合采样策略（80% 中心样本 + 20% 边缘样本），增强对极端环境的包容度
+- 新增：支持批量处理多个类别文件夹，自动遍历根目录下的所有类别子目录
+- 新增：支持单类别处理模式，可对单个类别文件夹生成模板库
+- 新增：自动检测处理模式，根据输入目录结构自动判断是批量模式还是单类别模式
+- 新增：命令行参数支持，包括 `--input_dir`、`--output_dir`、`--method`、`--num_templates`、`--edge_ratio`、`--num_em_iter` 等配置选项
+- 新增：样本数量不足时的自动处理逻辑，当图片数量少于所需模板数时直接使用所有图片
+- 优化：针对复杂环境（光线、烟雾、角度变化）优化聚类参数，默认迭代次数设置为 30 次
+- 优化：添加完善的错误处理和日志输出，包括文件存在性检查、去重处理、复制计数等
+
 ## 0.1.14 - 2026/01/26 16:46 (smartadpole)
 Implement open-set recognition evaluator with offline feature gallery
 

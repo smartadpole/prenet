@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.14
+**Version:** 0.1.15
 
 ### Introduction
 ![method](Method.png)
@@ -340,6 +340,55 @@ When `--visualize` is enabled, the tool generates visualization images showing:
 - Label text with confidence score displayed near the bbox
 - Format: `class_name: confidence` (confidence with 3 decimal places)
 
+### Template Library Generation
+
+To generate template library using fastdup clustering-based sampling for open-set recognition:
+
+```bash
+python tools/gen_sku.py \
+    --input_dir <input_directory> \
+    [OPTIONS]
+```
+
+**Required Parameters:**
+- `--input_dir`: Input directory containing category folders (for batch processing) or single category folder
+
+**Optional Parameters:**
+- `--output_dir`: Output directory for template library (default: `template_library`)
+- `--method`: Sampling method - `center` for cluster center sampling, `hybrid` for center + edge sampling (default: `center`)
+- `--num_templates`: Number of templates to generate per category (default: 15)
+- `--edge_ratio`: Ratio of edge samples for hybrid method, 0.0-1.0 (default: 0.2, means 20%)
+- `--num_em_iter`: Number of EM iterations for KMeans (default: 30, optimized for complex environments)
+- `--batch`: Batch process mode - treat input_dir as root containing multiple category folders
+- `--single`: Single category mode - treat input_dir as a single category folder
+
+**Sampling Methods:**
+- **Center Sampling (`--method center`)**: Clusters images into K clusters and extracts the image closest to each cluster center. Ideal for ensuring representative coverage of different scenes/angles.
+- **Hybrid Sampling (`--method hybrid`)**: Combines 80% center samples (representative) with 20% edge samples (extreme cases). Enhances robustness for complex environments with smoke, lighting variations, and angle changes.
+
+**Processing Modes:**
+- **Auto-detect**: If `--batch` or `--single` is not specified, the tool automatically detects the mode based on directory structure
+- **Batch mode**: Processes all category subdirectories in the input directory
+- **Single mode**: Processes a single category folder
+
+**Use Cases:**
+- Generate diverse template libraries for open-set recognition
+- Handle complex environments with lighting, smoke, and angle variations
+- Ensure representative coverage with limited template quota (10-20 images per category)
+
+**Output:**
+- Template images organized by category in the output directory
+- Each template is named with its cluster ID for traceability
+- For hybrid method, templates are labeled as `center_c*` or `edge_c*`
+
+**Example:**
+```bash
+# Batch process all categories with center sampling
+python tools/gen_sku.py --input_dir ./my_dataset --batch --method center --num_templates 15
+
+# Single category with hybrid sampling
+python tools/gen_sku.py --input_dir ./my_dataset/category1 --single --method hybrid --num_templates 20 --edge_ratio 0.2
+```
 
 ## Contact
 If you find this repo useful to your project, please consider to cite it with following bib:

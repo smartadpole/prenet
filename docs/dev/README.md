@@ -45,6 +45,12 @@ This directory contains technical documentation for developers and maintainers o
   - Weighted voting mechanism
   - Open-set rejection logic
 
+- **[Template Library Generation](gen_sku_template_library.md)**
+  - Fastdup-based clustering sampling for template library generation
+  - Center sampling and hybrid sampling strategies
+  - Batch processing and auto-detection modes
+  - Performance optimization for complex environments
+
 ## Documentation Standards
 
 All developer documentation follows the **Five Pillars** structure:
@@ -85,6 +91,7 @@ All developer documentation follows the **Five Pillars** structure:
 1. [DINOv2 Classification Testing](test_dinov2_classification.md) for single image classification
 2. [Full Pipeline Testing](test_full.md) for batch CSV processing
 3. [Open-Set Recognition Evaluation](eval_open_set.md) for open-set recognition with offline feature gallery
+4. [Template Library Generation](gen_sku_template_library.md) for generating diverse template libraries
 
 ### For Maintenance
 - All documents include design rationale sections explaining "why"
@@ -93,9 +100,9 @@ All developer documentation follows the **Five Pillars** structure:
 
 ## Version Information
 
-- **Current Version**: 0.1.14
+- **Current Version**: 0.1.15
 - **Last Updated**: 2026/01/26
-- **Key Changes**: Implement open-set recognition evaluator with offline feature gallery
+- **Key Changes**: Implement template library generation using fastdup clustering-based sampling
 
 ## Contributing
 
