@@ -100,9 +100,9 @@ All developer documentation follows the **Five Pillars** structure:
 
 ## Version Information
 
-- **Current Version**: 0.1.16
+- **Current Version**: 0.1.18
 - **Last Updated**: 2026/01/28
-- **Key Changes**: Refactor gen_sku.py CLI to --input/--output, add file-list mode and leaf-dir recursive mode; output single txt template list
+- **Key Changes**: Fix gen_sku fastdup clustering API (input_dir) and filename deduplication before sampling; test_full load_image error handling; logger DEBUG/INFO colors
 
 ## Contributing
 

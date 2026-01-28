@@ -35,8 +35,8 @@ TIME_LEVEL = 15
 logging.addLevelName(TIME_LEVEL, 'TIME')
 
 COLORS = {
-    'DEBUG': '\033[94m',        # Blue
-    'INFO': '\033[97m',         # White (default)
+    'DEBUG': '\033[97m',        # Blue
+    'INFO': '\033[94m',         # White (default)
     'WARNING': '\033[93m',      # Yellow
     'ERROR': '\033[91m',         # Red
     'CRITICAL': '\033[41;1m',   # Red background with bold white text

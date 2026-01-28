@@ -248,7 +248,8 @@ def load_image(image_path: str, base_dir: str = None):
         img_path = os.path.join(base_dir, img_path)
 
     if not os.path.exists(img_path):
-        print(f"[LoadImage] Image not found: {img_path}", level="debug")
+        print(f"[LoadImage] Image not found: {img_path}", level="error")
+        exit(1)
         return None
 
     try:

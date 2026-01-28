@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.18 - 2026/01/28 15:45 (smartadpole)
+Fix SKU clustering API and deduplication in gen_sku
+
+- 修复：`tools/gen_sku.py` 中 fastdup 聚类调用方式，改为使用 `fastdup.run_kmeans(input_dir=image_paths, work_dir=..., ...)`，不再通过 subset.csv + fd.run(annotations=...) 间接调用，避免聚类错误
+- 修复：读取 kmeans_assignments 后按 filename 去重（保留每张图片距离最小的记录），再执行簇内采样，避免同一图片多簇导致的采样异常
+- 优化：`gen_sku.py` 增加 tqdm 进度条、启动前清理 work_dirs、输出路径标准化为绝对路径，并统一使用 logger 的 `print(..., level=...)`
+- 修复：`tools/test_full.py` 中 `load_image` 在图片不存在时改为输出 error 并 exit(1)，避免静默继续
+- 变更：`utils/logger.py` 中 DEBUG 与 INFO 的控制台颜色对调（DEBUG 白色、INFO 蓝色）
+
 ## 0.1.17 - 2026/01/28 14:30 (smartadpole)
 Add class filter mode for eval and test_full inference
 

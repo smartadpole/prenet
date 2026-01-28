@@ -10,16 +10,17 @@
 
 ```
 gen_sku.py
-├── 核心采样模块
-│   ├── method2_template_sampling()      # 聚类中心采样
-│   └── method2_hybrid_sampling()        # 混合采样（中心+边缘）
-├── 批量处理模块
-│   └── process_categories()             # 批量处理多个类别
-├── 工具函数
+├── 核心采样
+│   ├── perform_sampling_from_df()       # 从聚类结果 DataFrame 执行中心/混合采样
+│   └── _run_fastdup_kmeans()            # 调用 fastdup.run_kmeans(input_dir=..., work_dir=...)
+├── 流程与数据
+│   ├── process_by_dataframe()           # 按类别组内独立聚类并写结果列表
+│   ├── process_by_file() / process_by_directory()
+│   ├── load_data_from_file()            # 解析文件列表为 DataFrame（与 eval.load_test_file 一致）
+│   └── _normalize_kmeans_df() / _pick_assignments_csv()
+├── 工具
 │   └── mkdir_simple()                   # 从 utils.file 导入
-└── 主程序
-    ├── GetArgs()                        # 参数解析
-    └── main()                           # 主入口
+└── main()                               # 参数解析与入口
 ```
 
 ### 数据流
@@ -167,9 +168,9 @@ else:
 ### Fastdup 集成
 
 **API 使用：**
-- `fastdup.run_kmeans()`: 执行 KMeans 聚类
-- 输出文件：`kmeans_assignments.csv`
-- CSV 格式：`index, filename, cluster, distance`
+- 直接调用 `fastdup.run_kmeans(input_dir=image_paths, work_dir=class_work_dir, num_clusters=..., num_em_iter=..., verbose=False)`，其中 `image_paths` 为当前类别图片路径列表。**必须使用 `input_dir` 传入路径列表**，不得通过 subset.csv + `fd.run(annotations=...)` 再 `run_kmeans(work_dir=...)` 的方式间接调用，否则会导致聚类错误（v0.1.18 修复）。
+- 输出文件：`kmeans_assignments.csv`（默认在 `work_dir` 下，可通过 `_pick_assignments_csv(work_dir)` 解析）
+- CSV 格式：含 `filename`、`cluster`、`distance` 等列（列名可能为 `cluster_id`/`dist`，由 `_normalize_kmeans_df` 统一为 `cluster`/`distance`）
 
 **参数调优：**
 - `num_em_iter=30`: 增加迭代次数以应对光线和烟雾干扰
@@ -177,13 +178,14 @@ else:
 
 ### 数据去重策略
 
-**问题：** fastdup 可能将同一张图片分配到多个簇（虽然概率较低）
+**问题：** fastdup 输出中同一张图片可能出现在多条记录（多簇或重复），若直接按簇采样会导致同一图片被多次选中或采样异常。
 
-**解决方案：**
+**解决方案：** 读取 `kmeans_assignments.csv` 并完成列名规范化（`_normalize_kmeans_df`）后，**先按 filename 去重，再执行簇内采样**。去重规则：每张图片只保留一条记录，取该图片在所有簇中 `distance` 最小的那条（即其“最归属”的簇）。
 ```python
 # 按 filename 分组，保留 distance 最小的记录
 df_clusters = df_clusters.loc[df_clusters.groupby('filename')['distance'].idxmin()]
 ```
+此后再进行 `groupby('cluster')['distance'].idxmin()` 等簇内采样。
 
 ### 文件命名规则
 

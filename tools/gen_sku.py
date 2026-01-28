@@ -4,13 +4,46 @@ import sys
 import os
 import argparse
 import glob
+import shutil
 import pandas as pd
 import fastdup
 from utils.file import mkdir_simple
 from tools.eval import load_test_file
+from utils.logger import logger_manager
+from tqdm import tqdm
+from utils.utils import timeit
+from contextlib import contextmanager
 
 # 图像后缀
 IMG_EXTS = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
+
+# todo: smart 2026-01-28 19:34 - unbelievable fix for suppress stdout/stderr of fastdup
+@contextmanager
+def suppress_stdout_stderr():
+    """
+    底层文件描述符级别重定向，能够拦截 C/C++ 库的 printf 输出
+    """
+    # 保存原始的 stdout 和 stderr 文件描述符
+    save_stdout_fd = os.dup(sys.stdout.fileno())
+    save_stderr_fd = os.dup(sys.stderr.fileno())
+
+    try:
+        # 打开 /dev/null
+        with open(os.devnull, 'w') as fnull:
+            # 将 stdout 和 stderr 强制指向 /dev/null
+            os.dup2(fnull.fileno(), sys.stdout.fileno())
+            os.dup2(fnull.fileno(), sys.stderr.fileno())
+            yield
+    finally:
+        # 恢复原始的文件描述符
+        os.dup2(save_stdout_fd, sys.stdout.fileno())
+        os.dup2(save_stderr_fd, sys.stderr.fileno())
+        # 关闭备份的描述符
+        os.close(save_stdout_fd)
+        os.close(save_stderr_fd)
+
+logger_manager.set_log_level(level="debug")
+
 
 def load_data_from_file(file_path):
     """
@@ -21,6 +54,7 @@ def load_data_from_file(file_path):
         print(f"文件不存在: {file_path}")
         return None
 
+    print(f"正在加载文件列表: {file_path}")
     file_list = load_test_file(file_path)
     if not file_list:
         return None
@@ -85,16 +119,9 @@ def _pick_assignments_csv(work_dir):
 
 def _run_fastdup_kmeans(class_work_dir, image_paths, num_clusters, num_em_iter):
     mkdir_simple(class_work_dir)
-    temp_anno = os.path.join(class_work_dir, "subset.csv")
-    pd.DataFrame({'filename': image_paths}).to_csv(temp_anno, index=False)
-
-    fd = fastdup.create(work_dir=class_work_dir)
-    fd.run(annotations=temp_anno)
-
-    if hasattr(fd, "run_kmeans"):
-        fd.run_kmeans(num_clusters=num_clusters, num_em_iter=num_em_iter, verbose=False)
-    else:
+    with suppress_stdout_stderr():
         fastdup.run_kmeans(
+            input_dir=image_paths,
             work_dir=class_work_dir,
             num_clusters=num_clusters,
             num_em_iter=num_em_iter,
@@ -103,6 +130,7 @@ def _run_fastdup_kmeans(class_work_dir, image_paths, num_clusters, num_em_iter):
 
     return _pick_assignments_csv(class_work_dir)
 
+# @timeit(1)
 def process_by_dataframe(df_list, output_file, method, num_templates, edge_ratio, num_em_iter):
     if df_list is None or df_list.empty:
         return
@@ -115,15 +143,21 @@ def process_by_dataframe(df_list, output_file, method, num_templates, edge_ratio
     df_valid = df_list[df_list['exists']].copy()
 
     if df_valid.empty:
-        print("错误: 没有有效图片路径")
+        print("错误: 没有有效图片路径", level="error")
         return
 
     output_dir = os.path.dirname(output_file) or "."
+    work_root = os.path.join(output_dir, "work_dirs")
+    if os.path.isdir(work_root):
+        shutil.rmtree(work_root, ignore_errors=True)
     all_sampled_records = []
 
     # 按类别进行组内独立聚类，防止特征跨类干扰
-    for (label_id, class_name), group in df_valid.groupby(['label_id', 'class_name'], sort=False):
-        print(f"\n>> 正在处理类别: {class_name} (样本总数: {len(group)})")
+    pbar = tqdm(df_valid.groupby(['label_id', 'class_name'], sort=False), desc="[采样进度]", unit="类")
+
+    for (label_id, class_name), group in pbar:
+        # 在进度条右侧动态显示类别和数量
+        pbar.set_postfix_str(f"当前: {class_name} ({len(group)}张)")
 
         if len(group) <= num_templates or len(group) < 10:
             all_sampled_records.extend(group[['filename', 'label_id', 'class_name']].to_dict('records'))
@@ -131,10 +165,11 @@ def process_by_dataframe(df_list, output_file, method, num_templates, edge_ratio
 
         # 为该类创建独立的隔离工作目录
         class_work_dir = os.path.join(output_dir, "work_dirs", f"label_{label_id}")
+        file_list = group['filename'].tolist()
 
         assignments_path = _run_fastdup_kmeans(
             class_work_dir=class_work_dir,
-            image_paths=group['filename'].tolist(),
+            image_paths=file_list,
             num_clusters=num_templates,
             num_em_iter=num_em_iter,
         )
@@ -162,7 +197,10 @@ def process_by_dataframe(df_list, output_file, method, num_templates, edge_ratio
     with open(output_file, 'w', encoding='utf-8') as f:
         for item in all_sampled_records:
             f.write(f"{item['filename']},{item['label_id']},{item['class_name']}\n")
-    print(f"\n✓ 任务完成！采样结果已保存至: {output_file}")
+    print(f"\n✓ 任务完成！采样结果已保存至: {output_file}", level="info")
+    print(f"  - 输入类别数: {df_valid['label_id'].nunique()}")
+    print(f"  - 采样类别数: {len(set([r['label_id'] for r in all_sampled_records]))}")
+    print(f"  - 总采样数量: {len(all_sampled_records)} 条记录")
 
 def process_by_file(list_file, output_file, method, num_templates, edge_ratio, num_em_iter):
     """
@@ -223,7 +261,19 @@ def main():
 
     args = parser.parse_args()
 
-    output_file = args.output if args.output else (args.input if os.path.isfile(args.input) else args.input.rstrip('/') + "_templates.txt")
+    if args.output:
+        output_file = args.output
+    else:
+        input_path = os.path.normpath(args.input)
+
+        if os.path.isfile(input_path):
+            file_root, file_ext = os.path.splitext(input_path)
+            output_file = f"{file_root}_templates{file_ext}"
+        else:
+            output_file = os.path.join(input_path, "templates.txt")
+
+    output_file = os.path.abspath(output_file)
+    print(f"计划输出路径: {output_file}")
 
     if os.path.isfile(args.input):
         process_by_file(args.input, output_file, args.method, args.num_templates, args.edge_ratio, args.num_em_iter)
