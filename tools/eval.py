@@ -121,7 +121,7 @@ def load_model(model_path: str, device: str = "cuda"):
 
 @timeit(100)
 @torch.no_grad()
-def classify(embedder, head, img_tensor):
+def classify(embedder, head, img_tensor, allowed_indices=None):
     """
     Classify batch of images.
     
@@ -129,6 +129,7 @@ def classify(embedder, head, img_tensor):
         embedder: DinoV2Embedder model
         head: ArcFaceHead model
         img_tensor: Tensor of shape [batch_size, C, H, W]
+        allowed_indices: Optional list/tensor of allowed class indices
         
     Returns:
         pred_classes: Tensor of shape [batch_size], predicted class indices
@@ -137,6 +138,10 @@ def classify(embedder, head, img_tensor):
     z = embedder(img_tensor)
     W = F.normalize(head.W, dim=1)
     logits = head.s * F.linear(z, W)
+    if allowed_indices is not None:
+        mask = torch.full_like(logits, float("-inf"))
+        mask[:, allowed_indices] = logits[:, allowed_indices]
+        logits = mask
     probs = F.softmax(logits, dim=1)
     
     pred_classes = logits.argmax(dim=1)
@@ -146,7 +151,7 @@ def classify(embedder, head, img_tensor):
 
 
 @torch.no_grad()
-def classify_batch(embedder, head, image_paths: list, transform, device: str):
+def classify_batch(embedder, head, image_paths: list, transform, device: str, allowed_indices=None):
     """
     Classify a batch of images.
     
@@ -156,6 +161,7 @@ def classify_batch(embedder, head, image_paths: list, transform, device: str):
         image_paths: List of image file paths
         transform: Image transform pipeline
         device: Device to run inference on
+        allowed_indices: Optional list/tensor of allowed class indices
         
     Returns:
         results: List of tuples (predicted_class, confidence) for each image
@@ -182,7 +188,14 @@ def classify_batch(embedder, head, image_paths: list, transform, device: str):
         return [(None, None)] * len(image_paths)
     
     batch_tensor = torch.stack(batch_tensors).to(device)
-    pred_classes, confidences = classify(embedder, head, batch_tensor)
+    if allowed_indices is not None:
+        allowed_indices = [i for i in allowed_indices if 0 <= i < head.W.shape[0]]
+        if len(allowed_indices) == 0:
+            print("[Warning] No valid allowed_indices after filtering; skip class filtering")
+            allowed_indices = None
+        else:
+            allowed_indices = torch.tensor(allowed_indices, device=device, dtype=torch.long)
+    pred_classes, confidences = classify(embedder, head, batch_tensor, allowed_indices)
     
     pred_classes = pred_classes.cpu()
     confidences = confidences.cpu()

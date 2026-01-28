@@ -75,10 +75,9 @@ All developer documentation follows the **Five Pillars** structure:
 - Data schemas and key fields
 
 ### V. Requirements & Context Traceability
-- Requirement specifications
-- Design strategies
-- Connection to existing business logic
-- Conflict resolution and versioning
+- **[Requirements Traceability](requirements_trace.md)**：Prompt → 需求规格 → 设计策略 → 实现的完整追溯
+- Requirement specifications and design strategies
+- Connection to existing business logic and conflict resolution
 
 ## Quick Links
 
@@ -94,6 +93,7 @@ All developer documentation follows the **Five Pillars** structure:
 4. [Template Library Generation](gen_sku_template_library.md) for generating diverse template libraries
 
 ### For Maintenance
+- **[Requirements Traceability](requirements_trace.md)**：新增/变更需求时在此记录 ID、规格、策略与实现，便于迁移与冲突检查
 - All documents include design rationale sections explaining "why"
 - Parameter comparison tables show evolution of design decisions
 - Future improvements sections outline potential enhancements

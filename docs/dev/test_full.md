@@ -22,7 +22,7 @@ test_full.py
 │   └── visualize_image_with_bbox()  # 在原始图片上绘制 bbox、标签和置信度
 ├── 推理模块（复用）
 │   ├── load_model()          # 从 eval.py 导入
-│   ├── classify_batch()       # 从 eval.py 导入
+│   ├── classify_batch()      # 从 eval.py 导入（支持 allowed_indices 类别过滤）
 │   └── build_val_tfm()       # 从 eval.py 导入
 └── 主程序
     └── main()
@@ -356,7 +356,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 1. **初始化阶段**
    - 解析命令行参数
    - 设置设备（CUDA/CPU）
-   - 加载类别名称映射（如果提供）
+   - 加载类别名称映射（如果提供）；若存在有效类别名则计算 `allowed_indices`，推理时仅预测这些类别（过滤模式）
    - 加载模型和构建变换管道
 
 2. **数据读取阶段**
@@ -370,7 +370,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 
 4. **批量推理阶段**
    - 按 `batch_size` 分批处理所有裁剪后的图片
-   - 调用 `classify_batch` 进行批量推理
+   - 调用 `classify_batch(..., allowed_indices=allowed_indices)` 进行批量推理（过滤模式下仅预测 label_file 中定义的类别）
    - 显示进度条
 
 5. **结果映射阶段**
@@ -406,6 +406,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 1. **DRY 原则：** 避免重复代码，减少维护成本
 2. **一致性：** 确保推理逻辑与评估脚本完全一致
 3. **可维护性：** 如果推理逻辑需要更新，只需修改一处
+4. **类别过滤：** 使用 `--label_file` 时，将有效类别索引作为 `allowed_indices` 传入 `classify_batch`，预测仅在该子集内取 argmax，避免模型输出头大于标签集时的越界或无关类别被选中。
 
 ### 为什么先收集所有图片再批量推理？
 

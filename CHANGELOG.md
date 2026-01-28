@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.17 - 2026/01/28 14:30 (smartadpole)
+Add class filter mode for eval and test_full inference
+
+- 新增：`tools/eval.py` 中 `classify`、`classify_batch` 支持可选参数 `allowed_indices`，可将预测限制在指定类别子集内（logits 掩码只保留允许类别）
+- 新增：`tools/test_full.py` 在加载 `--label_file` 时根据有效类别名计算 `allowed_indices` 并传入 `classify_batch`，实现“仅预测标签文件中定义的类别”的过滤模式
+- 优化：过滤模式下打印信息日志（限制到 N 个类别），无效或空 allowed_indices 时自动回退为不过滤
+
 ## 0.1.16 - 2026/01/28 12:00 (smartadpole)
 Refactor gen_sku template tool CLI and add file-list mode
 

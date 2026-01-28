@@ -762,6 +762,14 @@ def main():
 
     # Load class names mapping
     classes = load_label_file(args.label_file)
+    allowed_indices = None
+    if classes is not None:
+        allowed_indices = [i for i, name in enumerate(classes) if name is not None]
+        if len(allowed_indices) == 0:
+            print("[Warning] Label file contains no valid classes; skip class filtering")
+            allowed_indices = None
+        else:
+            print(f"[Info] Filter mode: restrict predictions to {len(allowed_indices)} classes")
 
     # Load model
     print(f"[Info] Loading model from {args.model_path}")
@@ -804,7 +812,7 @@ def main():
             end_idx = min(start_idx + args.batch_size, len(all_image_paths))
             batch_paths = all_image_paths[start_idx:end_idx]
 
-            batch_results = classify_batch(embedder, head, batch_paths, transform, device)
+            batch_results = classify_batch(embedder, head, batch_paths, transform, device, allowed_indices=allowed_indices)
             all_results.extend(batch_results)
 
             pbar.update(len(batch_paths))
