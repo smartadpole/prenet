@@ -18,3 +18,5 @@ matplotlib>=3.3.0
 # Model components
 dropblock>=0.3.0
 
+# for cluster
+fastdup>=1.0.0

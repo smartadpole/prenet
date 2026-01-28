@@ -8,8 +8,7 @@
 
 - **聚类中心采样**：从每个聚类簇中提取距离中心最近的图片，确保代表性
 - **混合采样策略**：结合中心样本和边缘样本，增强对极端环境的包容度
-- **批量处理支持**：自动处理多个类别文件夹
-- **智能模式检测**：自动识别批量模式或单类别模式
+- **灵活输入方式**：支持（1）根目录递归扫描，识别多层子目录下“叶子”类别目录；（2）文件列表（路径、ID、类别名，格式同 `eval.load_test_file`）
 - **复杂环境优化**：针对光线、烟雾、角度变化等复杂场景优化参数
 
 ## 安装要求
@@ -24,38 +23,47 @@ pip install fastdup pandas
 
 ### 基本用法
 
-#### 批量处理多个类别
+**根据 `--input` 类型自动选择模式：**
+
+- **输入为文件**：文件列表模式。文件每行三列（制表符/空格/逗号分隔）：`图片绝对路径`、`ID`、`类别名`，格式与 `eval.load_test_file` 一致。对列表中涉及的所有目录做一次 fastdup 特征分析，再按标签组内做聚类采样（中心或混合）。
+- **输入为目录**：递归目录模式。递归扫描根目录下所有子目录，将**包含图片且不为其它含图目录父目录**的“叶子”目录视为类别，对每个类别分别做聚类采样。
+
+#### 递归目录模式（多层嵌套目录）
 
 ```bash
 python tools/gen_sku.py \
-    --input_dir ./my_dataset \
-    --batch \
+    --input ./my_dataset \
     --method center \
     --num_templates 15
 ```
 
-#### 处理单个类别
+#### 文件列表模式
 
 ```bash
 python tools/gen_sku.py \
-    --input_dir ./my_dataset/category1 \
-    --single \
+    --input /path/to/list.txt \
     --method hybrid \
-    --num_templates 20
+    --num_templates 20 \
+    --edge_ratio 0.2
+```
+
+列表文件示例（`list.txt`）：
+```
+/path/to/img1.jpg	0	类别A
+/path/to/img2.png	0	类别A
+/path/to/img3.jpg	1	类别B
 ```
 
 ### 参数说明
 
 | 参数 | 类型 | 必需 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| `--input_dir` | str | 是 | - | 输入目录（类别文件夹或根目录） |
-| `--output_dir` | str | 否 | `template_library` | 模板库输出目录 |
+| `--input` | str | 是 | - | 数据集根目录（递归扫描叶子类别）或文件列表路径（三列：路径、ID、类别名） |
+| `--output` | str | 否 | 见下 | 输出模板列表 txt 文件路径。目录输入时默认 `<input>_templates.txt`；文件输入时默认与输入同路径 |
 | `--method` | str | 否 | `center` | 采样方法：`center`（中心采样）或 `hybrid`（混合采样） |
-| `--num_templates` | int | 否 | 15 | 每个类别生成的模板数量 |
+| `--num_templates` | int | 否 | 20 | 每个类别生成的模板数量 |
 | `--edge_ratio` | float | 否 | 0.2 | 边缘样本比例（仅混合模式，0.0-1.0） |
 | `--num_em_iter` | int | 否 | 30 | KMeans 迭代次数（针对复杂环境优化） |
-| `--batch` | flag | 否 | - | 强制批量处理模式 |
-| `--single` | flag | 否 | - | 强制单类别处理模式 |
 
 ### 采样方法详解
 
@@ -71,7 +79,7 @@ python tools/gen_sku.py \
 **示例：**
 ```bash
 python tools/gen_sku.py \
-    --input_dir ./my_dataset \
+    --input ./my_dataset \
     --method center \
     --num_templates 15
 ```
@@ -88,135 +96,82 @@ python tools/gen_sku.py \
 **示例：**
 ```bash
 python tools/gen_sku.py \
-    --input_dir ./my_dataset \
+    --input ./my_dataset \
     --method hybrid \
     --num_templates 20 \
     --edge_ratio 0.2
 ```
 
-### 处理模式
+### 输入模式说明
 
-#### 自动检测模式（推荐）
-
-如果不指定 `--batch` 或 `--single`，工具会自动检测：
-
-- 如果输入目录包含子目录 → 批量模式
-- 如果输入目录直接包含图片 → 单类别模式
-
-```bash
-# 自动检测为批量模式
-python tools/gen_sku.py --input_dir ./my_dataset --num_templates 15
-
-# 自动检测为单类别模式
-python tools/gen_sku.py --input_dir ./my_dataset/category1 --num_templates 15
-```
-
-#### 批量处理模式
-
-处理输入目录下的所有类别子目录：
-
-```bash
-python tools/gen_sku.py \
-    --input_dir ./my_dataset \
-    --batch \
-    --num_templates 15
-```
-
-**目录结构示例：**
-```
-my_dataset/
-├── category1/
-│   ├── img1.jpg
-│   ├── img2.jpg
-│   └── ...
-├── category2/
-│   ├── img1.jpg
-│   └── ...
-└── category3/
-    └── ...
-```
-
-#### 单类别处理模式
-
-处理单个类别文件夹：
-
-```bash
-python tools/gen_sku.py \
-    --input_dir ./my_dataset/category1 \
-    --single \
-    --num_templates 15
-```
+- **目录输入**：递归扫描，将“叶子”目录（包含图片且无子目录再含图）视为类别。支持多层嵌套，如 `my_dataset/brand/model/sku/` 中 `sku` 为叶子类别。
+- **文件列表输入**：三列（路径、ID、类别名），对列表中涉及的所有目录做一次 fastdup 分析，再按标签组内做聚类采样。
 
 ## 使用示例
 
-### 示例 1：为开集识别生成模板库
+### 示例 1：递归目录 + 中心采样
 
 ```bash
-# 使用中心采样，每个类别生成 15 张模板
+# 递归扫描 dataset，叶子目录为类别，每个类别 15 张模板
 python tools/gen_sku.py \
-    --input_dir ./dataset \
-    --batch \
+    --input ./dataset \
     --method center \
     --num_templates 15 \
-    --output_dir ./template_library
+    --output ./template_library/templates.txt
 ```
 
-### 示例 2：复杂环境下的混合采样
+### 示例 2：递归目录 + 混合采样
 
 ```bash
-# 使用混合采样，增加对极端情况的包容度
+# 递归目录，混合采样增强对极端情况的包容度
 python tools/gen_sku.py \
-    --input_dir ./dataset \
-    --batch \
+    --input ./dataset \
     --method hybrid \
     --num_templates 20 \
     --edge_ratio 0.2 \
     --num_em_iter 30
 ```
 
-### 示例 3：处理单个类别
+### 示例 3：文件列表模式
 
 ```bash
-# 为单个类别生成模板库
+# 从 list.txt（路径、ID、类别名）生成模板库
 python tools/gen_sku.py \
-    --input_dir ./dataset/category_A \
-    --single \
+    --input /path/to/list.txt \
     --method center \
     --num_templates 10 \
-    --output_dir ./templates_category_A
+    --output ./templates_from_list.txt
 ```
 
 ## 输出说明
 
-### 目录结构
+### 输出文件
+
+工具输出**单个 txt 文件**（由 `--output` 指定），每行一条模板记录，格式为：
 
 ```
-template_library/
-├── category1/
-│   ├── template_c0.jpg
-│   ├── template_c1.jpg
-│   └── ...
-├── category2/
-│   ├── template_c0.jpg
-│   └── ...
-└── work_category1/          # 临时工作目录
-    └── kmeans_assignments.csv
+<绝对路径>,<label_id>,<类别名>
 ```
 
-### 文件命名规则
+示例：
 
-- **中心采样模式**：`template_c{cluster_id}.{ext}`
-  - 例如：`template_c0.jpg`, `template_c1.png`
-  
-- **混合采样模式**：
-  - 中心样本：`center_c{cluster_id}_{original_name}`
-  - 边缘样本：`edge_c{cluster_id}_{original_name}`
+```
+/path/to/img1.jpg,0,类别A
+/path/to/img2.png,0,类别A
+/path/to/img3.jpg,1,类别B
+```
+
+该文件可直接作为开集评估（如 `eval_open.py`）的模板列表使用。
+
+### 临时工作目录
+
+聚类过程会在**输出文件所在目录**下创建临时目录 `work_dirs/`，按类别子目录（如 `work_dirs/label_0/`）存放 fastdup 中间文件。可手动删除以节省空间。
 
 ## 注意事项
 
 1. **样本数量限制**：如果某个类别的图片数量少于所需模板数，工具会自动使用所有图片作为模板。
 
-2. **工作目录**：工具会在输出目录下创建临时工作目录（`work_*`），包含 fastdup 的中间文件。可以手动删除这些目录以节省空间。
+2. **工作目录**：工具会在输出文件所在目录下创建临时工作目录 `work_dirs/`，包含 fastdup 的中间文件。可以手动删除以节省空间。
 
 3. **性能考虑**：
    - 聚类计算时间与图片数量和迭代次数成正比

@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.15
+**Version:** 0.1.16
 
 ### Introduction
 ![method](Method.png)
@@ -345,49 +345,34 @@ When `--visualize` is enabled, the tool generates visualization images showing:
 To generate template library using fastdup clustering-based sampling for open-set recognition:
 
 ```bash
-python tools/gen_sku.py \
-    --input_dir <input_directory> \
-    [OPTIONS]
+python tools/gen_sku.py --input <path_or_file> [OPTIONS]
 ```
 
-**Required Parameters:**
-- `--input_dir`: Input directory containing category folders (for batch processing) or single category folder
+**Input (required):**
+- **Directory**: Recursive scan; leaf dirs that contain images are treated as categories (supports nested structure).
+- **File**: File-list path. Format: 3 columns (path, id, class_name), tab/space/comma separated, same as `eval.load_test_file`. Runs fastdup on involved folders once, then per-label cluster sampling.
 
 **Optional Parameters:**
-- `--output_dir`: Output directory for template library (default: `template_library`)
+- `--output`: Output .txt file path for template list (default: `<input>_templates.txt` for directory, or same as input for file)
 - `--method`: Sampling method - `center` for cluster center sampling, `hybrid` for center + edge sampling (default: `center`)
-- `--num_templates`: Number of templates to generate per category (default: 15)
+- `--num_templates`: Number of templates to generate per category (default: 20)
 - `--edge_ratio`: Ratio of edge samples for hybrid method, 0.0-1.0 (default: 0.2, means 20%)
 - `--num_em_iter`: Number of EM iterations for KMeans (default: 30, optimized for complex environments)
-- `--batch`: Batch process mode - treat input_dir as root containing multiple category folders
-- `--single`: Single category mode - treat input_dir as a single category folder
-
-**Sampling Methods:**
-- **Center Sampling (`--method center`)**: Clusters images into K clusters and extracts the image closest to each cluster center. Ideal for ensuring representative coverage of different scenes/angles.
-- **Hybrid Sampling (`--method hybrid`)**: Combines 80% center samples (representative) with 20% edge samples (extreme cases). Enhances robustness for complex environments with smoke, lighting variations, and angle changes.
-
-**Processing Modes:**
-- **Auto-detect**: If `--batch` or `--single` is not specified, the tool automatically detects the mode based on directory structure
-- **Batch mode**: Processes all category subdirectories in the input directory
-- **Single mode**: Processes a single category folder
-
-**Use Cases:**
-- Generate diverse template libraries for open-set recognition
-- Handle complex environments with lighting, smoke, and angle variations
-- Ensure representative coverage with limited template quota (10-20 images per category)
 
 **Output:**
-- Template images organized by category in the output directory
-- Each template is named with its cluster ID for traceability
-- For hybrid method, templates are labeled as `center_c*` or `edge_c*`
+- Single .txt file with one line per template: `path,label_id,class_name`. Temporary fastdup work dirs are created under the same directory as the output file (`work_dirs/`).
 
-**Example:**
+**Sampling Methods:**
+- **Center Sampling (`--method center`)**: Clusters images into K clusters and extracts the image closest to each cluster center.
+- **Hybrid Sampling (`--method hybrid`)**: Combines center samples with edge samples (max distance in scattered clusters) for robustness.
+
+**Examples:**
 ```bash
-# Batch process all categories with center sampling
-python tools/gen_sku.py --input_dir ./my_dataset --batch --method center --num_templates 15
+# Recursive directory mode
+python tools/gen_sku.py --input ./my_dataset --method center --num_templates 15
 
-# Single category with hybrid sampling
-python tools/gen_sku.py --input_dir ./my_dataset/category1 --single --method hybrid --num_templates 20 --edge_ratio 0.2
+# File-list mode
+python tools/gen_sku.py --input /path/to/list.txt --method hybrid --num_templates 20 --edge_ratio 0.2
 ```
 
 ## Contact

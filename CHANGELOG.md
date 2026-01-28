@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.16 - 2026/01/28 12:00 (smartadpole)
+Refactor gen_sku template tool CLI and add file-list mode
+
+- 重大变更：`tools/gen_sku.py` 命令行从 `--input_dir`/`--output_dir`/`--batch`/`--single` 改为 `--input`（支持目录或文件列表）/`--output`（输出 txt 文件路径）
+- 新增：`gen_sku.py` 支持文件列表模式，输入为三列格式（路径、ID、类别名），与 `eval.load_test_file` 一致，按标签组内独立聚类采样
+- 新增：目录模式改为递归扫描“叶子”目录（包含图片且无子目录再含图）作为类别，支持多层嵌套
+- 变更：输出由按类别复制图片到子目录改为单文件列表（每行：路径,label_id,class_name），临时工作目录位于输出文件同目录下的 `work_dirs/`
+- 移除：`--batch`、`--single`、`--output_dir` 参数
+- 新增：`requirements.txt` 中增加 fastdup 依赖（`fastdup>=1.0.0`）
+- 优化：`README.md` 与 `docs/user/gen_sku_template_library.md` 中模板库章节与当前脚本行为一致（`--input`/`--output`、输出说明）
+
 ## 0.1.15 - 2026/01/26 18:32 (smartadpole)
 Implement template library generation using fastdup clustering-based sampling
 

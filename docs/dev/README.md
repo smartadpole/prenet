@@ -100,9 +100,9 @@ All developer documentation follows the **Five Pillars** structure:
 
 ## Version Information
 
-- **Current Version**: 0.1.15
-- **Last Updated**: 2026/01/26
-- **Key Changes**: Implement template library generation using fastdup clustering-based sampling
+- **Current Version**: 0.1.16
+- **Last Updated**: 2026/01/28
+- **Key Changes**: Refactor gen_sku.py CLI to --input/--output, add file-list mode and leaf-dir recursive mode; output single txt template list
 
 ## Contributing
 
