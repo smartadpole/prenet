@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.19 - 2026/01/29 12:00 (smartadpole)
+Auto-cleanup temp dirs and sync docs with code
+
+- 优化：`tools/gen_sku.py` 中 `process_by_dataframe` 写出结果后在 `finally` 中自动清理临时工作目录（work_root），无需手动删除
+- 变更：`tools/test_full.py` 中 `--temp_dir` 默认改为 None，未指定时使用输入 CSV 所在目录下的 `temp_cropped` 子目录，处理结束后自动删除该目录
+- 修复：`test_full.py` 中临时目录名拼写 `temp_croped` → `temp_cropped`
+- 优化：同步版本号与文档，并依据上述代码变更更新 docs（gen_sku/test_full 的 dev、user 及 README 中临时目录清理与 `--temp_dir` 默认行为说明）
+
 ## 0.1.18 - 2026/01/28 15:45 (smartadpole)
 Fix SKU clustering API and deduplication in gen_sku
 

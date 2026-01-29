@@ -318,7 +318,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 --base_dir       # 图片基础目录（可选，默认：输入 CSV 文件所在目录）
 --device         # 推理设备：cuda 或 cpu（默认：cuda）
 --batch_size     # 批量推理大小（默认：32）
---temp_dir       # 临时文件目录（默认：temp_cropped）
+--temp_dir       # 临时文件目录（可选，默认：None；未指定时使用输入 CSV 所在目录下的 temp_cropped 子目录，处理结束后自动删除）
 --temp_save_dir  # 按类别保存裁剪图片的目录（可选）
 --visualize      # 是否进行可视化（默认：False）。启用后会在加载阶段和测评阶段实时显示图像
 ```
@@ -364,6 +364,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
    - 验证必需列是否存在
 
 3. **图片处理阶段**
+   - 若未指定 `--temp_dir`，临时目录设为输入 CSV 所在目录下的 `temp_cropped` 子目录；否则使用指定路径
    - 遍历所有行，收集需要处理的图片
    - 批量裁剪图片并保存到临时目录
    - 统计成功和失败的任务
@@ -391,10 +392,11 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
    - 超过 1080p 的图像自动缩放到 1080p 以内显示
    - 使用 matplotlib 非阻塞模式，每张图像显示 0.1 秒后自动关闭
 
-8. **输出阶段**
+8. **输出与清理阶段**
    - 根据 `--suffix` 参数自动生成输出 CSV 文件名（格式：`{input_csv_basename}_{suffix}.csv`）
    - 将结果保存到输出 CSV 文件
    - 使用 UTF-8-BOM 编码确保 Excel 正确显示中文
+   - 删除临时裁剪目录（`temp_dir`），释放磁盘空间
 
 ## 设计决策
 
@@ -461,7 +463,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 
 ### 优化建议
 
-1. **临时文件清理：** 处理完成后可以自动删除临时文件（当前代码中已注释）
+1. **临时文件清理：** 处理完成后会自动删除临时裁剪目录（`shutil.rmtree(temp_dir)`），无需手动清理
 2. **缓存机制：** 如果同一张图片被多次使用，可以缓存裁剪结果
 3. **多进程裁剪：** 对于 CPU 模式，可以使用多进程加速图片裁剪
 

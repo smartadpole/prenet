@@ -193,11 +193,16 @@ def process_by_dataframe(df_list, output_file, method, num_templates, edge_ratio
                     'class_name': class_name
                 })
 
-    # 输出结果 txt
-    with open(output_file, 'w', encoding='utf-8') as f:
-        for item in all_sampled_records:
-            f.write(f"{item['filename']},{item['label_id']},{item['class_name']}\n")
-    print(f"\n✓ 任务完成！采样结果已保存至: {output_file}", level="info")
+    try:
+        # 输出结果 txt
+        with open(output_file, 'w', encoding='utf-8') as f:
+            for item in all_sampled_records:
+                f.write(f"{item['filename']},{item['label_id']},{item['class_name']}\n")
+        print(f"\n✓ 任务完成！采样结果已保存至: {output_file}", level="info")
+    finally:
+        # 清理临时缓存目录
+        if os.path.isdir(work_root):
+            shutil.rmtree(work_root, ignore_errors=True)
     print(f"  - 输入类别数: {df_valid['label_id'].nunique()}")
     print(f"  - 采样类别数: {len(set([r['label_id'] for r in all_sampled_records]))}")
     print(f"  - 总采样数量: {len(all_sampled_records)} 条记录")

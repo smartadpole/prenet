@@ -741,7 +741,7 @@ def main():
                         help="Device to run inference on")
     parser.add_argument("--batch_size", "-b", type=int, default=32,
                         help="Batch size for inference")
-    parser.add_argument("--temp_dir", type=str, default="temp_cropped",
+    parser.add_argument("--temp_dir", type=str, default=None,
                         help="Temporary directory for saving cropped images")
     parser.add_argument("--visualize", action='store_true', default=False,
                         help="Whether to visualize images with bbox, label and confidence")
@@ -790,11 +790,12 @@ def main():
     print(f"[Info] Loaded {len(df)} rows from CSV")
 
     # Create temp directory
-    os.makedirs(args.temp_dir, exist_ok=True)
+    temp_dir = os.path.join(os.path.dirname(args.input_csv), "temp_cropped") if not args.temp_dir else args.temp_dir
+    os.makedirs(temp_dir, exist_ok=True)
 
     # Step 1: Collect and crop all images
     base_dir = args.base_dir if args.base_dir else os.path.dirname(args.input_csv)
-    tasks, failed_tasks = collect_all_images(df, base_dir, args.temp_dir, args.visualize)
+    tasks, failed_tasks = collect_all_images(df, base_dir, temp_dir, args.visualize)
 
     if len(tasks) == 0:
         print("[Warning] No images were successfully cropped. Check your CSV and image paths.")
@@ -892,8 +893,8 @@ def main():
         return
 
     # Cleanup temp directory (optional)
-    shutil.rmtree(args.temp_dir)
-    print(f"[Info] Cleaned up temporary directory {args.temp_dir}")
+    shutil.rmtree(temp_dir)
+    print(f"[Info] Cleaned up temporary directory {temp_dir}")
 
     print("[Info] Processing completed!")
 

@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.18
+**Version:** 0.1.19
 
 ### Introduction
 ![method](Method.png)
@@ -311,7 +311,7 @@ python tools/test_full.py \
 - `--base_dir`: Base directory for resolving relative image paths (default: directory of input_csv)
 - `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
 - `--batch_size`, `-b`: Batch size for inference (default: 32)
-- `--temp_dir`: Temporary directory for saving cropped images (default: `temp_cropped`)
+- `--temp_dir`: Temporary directory for saving cropped images (default: None; when not specified, uses subdirectory `temp_cropped` under the input CSV directory, and the directory is removed after processing)
 - `--temp_save_dir`: Directory to save cropped images organized by category (optional)
 - `--visualize`: Enable visualization of images with bbox, label and confidence (default: False)
 - `--vis_output_dir`: Output directory for visualized images (default: `visualizations`, only used if `--visualize` is set)

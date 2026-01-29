@@ -100,9 +100,9 @@ All developer documentation follows the **Five Pillars** structure:
 
 ## Version Information
 
-- **Current Version**: 0.1.18
-- **Last Updated**: 2026/01/28
-- **Key Changes**: Fix gen_sku fastdup clustering API (input_dir) and filename deduplication before sampling; test_full load_image error handling; logger DEBUG/INFO colors
+- **Current Version**: 0.1.19
+- **Last Updated**: 2026/01/29
+- **Key Changes**: Sync version and documentation (README, docs/dev version info and dates)
 
 ## Contributing
 

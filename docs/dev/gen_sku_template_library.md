@@ -14,7 +14,7 @@ gen_sku.py
 │   ├── perform_sampling_from_df()       # 从聚类结果 DataFrame 执行中心/混合采样
 │   └── _run_fastdup_kmeans()            # 调用 fastdup.run_kmeans(input_dir=..., work_dir=...)
 ├── 流程与数据
-│   ├── process_by_dataframe()           # 按类别组内独立聚类并写结果列表
+│   ├── process_by_dataframe()           # 按类别组内独立聚类、写结果列表并在 finally 中清理 work_root
 │   ├── process_by_file() / process_by_directory()
 │   ├── load_data_from_file()            # 解析文件列表为 DataFrame（与 eval.load_test_file 一致）
 │   └── _normalize_kmeans_df() / _pick_assignments_csv()
@@ -286,7 +286,7 @@ df_clusters = df_clusters.loc[df_clusters.groupby('filename')['distance'].idxmin
 
 1. **fastdup 依赖**：需要确保 fastdup 正确安装和配置
 2. **内存限制**：超大数据集可能需要分批处理
-3. **工作目录清理**：临时工作目录需要手动清理
+3. **工作目录清理**：`process_by_dataframe` 在写出结果后会在 `finally` 中自动清理临时工作目录（`work_root`），无需手动清理
 4. **文件格式支持**：目前支持常见图片格式（jpg, png, bmp, tiff）
 
 ## 相关文档
