@@ -9,19 +9,8 @@ if [[ ! -f "$OUT" ]]; then
   echo "[INFO] created $OUT"
 fi
 
-# 你想让 Codex 吃哪些规则：这里直接全吃（也可改成白名单）
-# todo: smart 2026-01-28 15:54 - auto discover all .mdc files in RULE_DIR
-FILES=(
-  "auto-changelog.mdc"
-  "clean-code.mdc"
-  "coding-style.mdc"
-  "doc.mdc"
-  "file_head.mdc"
-  "no-repeat.mdc"
-  "timing.mdc"
-  "ui-language.mdc"
-  "version-control.mdc"
-)
+# Auto-discover all .mdc files in RULE_DIR (flat only) and keep a stable order.
+mapfile -t FILES < <(find "$RULE_DIR" -maxdepth 1 -type f -name "*.mdc" -printf "%f\n" | sort)
 
 {
   echo "# AGENTS.md"
@@ -38,7 +27,7 @@ FILES=(
     echo
     echo "## Cursor rule: $f"
     echo
-    # 去掉可能存在的 frontmatter（很多 .mdc 顶部会有 --- ... ---）
+    # Strip optional frontmatter blocks (--- ... ---) if present.
     awk '
       BEGIN{in_fm=0}
       NR==1 && $0 ~ /^---[[:space:]]*$/ {in_fm=1; next}

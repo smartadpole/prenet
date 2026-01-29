@@ -100,9 +100,9 @@ All developer documentation follows the **Five Pillars** structure:
 
 ## Version Information
 
-- **Current Version**: 0.1.19
+- **Current Version**: 0.1.20
 - **Last Updated**: 2026/01/29
-- **Key Changes**: Sync version and documentation (README, docs/dev version info and dates)
+- **Key Changes**: Align eval_open input/output with eval and support template directories
 
 ## Contributing
 

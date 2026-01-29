@@ -28,7 +28,7 @@ eval_open.py
 ### 数据流
 
 ```
-模板文件 → build_gallery() → 特征库 (gallery_features, gallery_labels)
+模板路径（文件列表或目录） → build_gallery() → 特征库 (gallery_features, gallery_labels)
     ↓
 测试文件 → identify() → Top-K 检索 → 加权投票 → 阈值判定 → 预测结果
     ↓
@@ -59,7 +59,9 @@ run_eval() → 批量评估 → 准确率统计 → 结果输出
 **职责：** 从模板图构建离线特征库
 
 **实现流程：**
-1. 加载模板文件（格式：`image_path label_id class_name`）
+1. 加载模板输入：
+   - 文件列表：三列格式（`image_path label_id class_name`）
+   - 目录：一级子目录名作为类别名（label），子目录内图片作为模板，自动分配 label_id
 2. 对每个模板图提取特征向量
 3. 按类别分组特征
 4. 对每个类别进行离群点清洗
@@ -105,6 +107,7 @@ run_eval() → 批量评估 → 准确率统计 → 结果输出
 - `top_k`：最近邻数量（默认 5）
 - `threshold`：绝对相似度阈值（默认 0.6）
 - `margin_threshold`：相对增益阈值（默认 0.1）
+- `batch_size`：批量推理大小（默认 32）
 
 **设计决策：**
 - 使用 Top-K 检索而非全量比较，提高计算效率
@@ -118,17 +121,15 @@ run_eval() → 批量评估 → 准确率统计 → 结果输出
 **得分计算公式：**
 
 ```
-Score(c) = Σ (similarity_i × rank_weight_i × size_weight_c)
+Score(c) = Σ (similarity_i × size_weight_c)
 ```
 
 其中：
 - `similarity_i`：第 i 个近邻的相似度
-- `rank_weight_i = 1 / (rank + 1)`：排名权重（排名越靠前权重越大）
 - `size_weight_c = 1 / log(N_c + 1)`：类别大小归一化权重（类别样本越多权重越小）
 
 **设计决策：**
 - **相似度权重**：距离越近的样本贡献越大
-- **排名权重**：使用逆排名权重，让 Top-1 的贡献最大，Top-K 的贡献最小
 - **类别大小归一化**：使用对数归一化，缓解样本量多的类别产生的压制效应
 - 相比简单投票，这种方式让距离更近的模板拥有更大话语权，即使某类别模板较少，只要其中一个模板与测试图极其相似，该类仍能胜出
 
@@ -138,17 +139,16 @@ Score(c) = Σ (similarity_i × rank_weight_i × size_weight_c)
 
 **实现流程：**
 1. 加载测试文件
-2. 对每个测试样本调用 `identify()` 进行识别
-3. 统计预测结果（将 -1 视为 None 以兼容 `calculate_metrics`）
-4. 计算总体和分类别准确率
-5. 统计未知类判定数量
-6. 输出详细结果到文件
+2. 批量提取特征并执行 Top-K 检索与投票
+3. 统计预测结果（将 -1 视为 None，但在统计时仍计入总数）
+4. 计算总体和分类别准确率（按类别标签名对比，未知预测计为错误）
+5. 输出与 `eval.py` 一致的结果文件与可视化
 
 **输出内容：**
 - 总体准确率、正确数、错误数、总数
-- 未知类判定数量
 - 分类别准确率统计
-- 每个样本的详细结果（路径、真实标签、预测标签、置信度、是否正确、是否未知）
+- 每个类别的可视化结果（Top-10 正确样本 + 所有错误样本）
+- 未知预测在可视化中标记为 `Unknown/Rejected`
 
 ## 技术对比
 
@@ -172,6 +172,18 @@ Score(c) = Σ (similarity_i × rank_weight_i × size_weight_c)
 <absolute_image_path> <label_id> <class_name>
 ```
 
+**模板目录格式：**
+```
+<template_root>/
+├── <label_name_1>/
+│   ├── img1.jpg
+│   └── ...
+└── <label_name_2>/
+    └── ...
+```
+
+模板库缓存目录固定为模板目录同级的 `gallery_cache_<model_version>`，自动读写。
+
 **测试文件格式：**
 ```
 <absolute_image_path> <label_id> <class_name>
@@ -181,37 +193,33 @@ Score(c) = Σ (similarity_i × rank_weight_i × size_weight_c)
 
 **结果文件格式：**
 ```
-Open-Set Recognition Results
+Evaluation Results
 ============================================================
-Template File: <path>
-Test File: <path>
-Threshold: <value>
-Top-K: <value>
-Margin Threshold: <value>
-============================================================
+Overall Accuracy: <value> (<percent>%)
+Overall: Correct=<count>, Wrong=<count>, Total=<count>
 
-Image: <path>
-  True: <class_name> (ID: <label_id>)
-  Pred: <class_name> (ID: <label_id>)
-  Confidence: <value>
-  Correct: <true/false>
-  Unknown: <true/false>
+Per-Class Accuracy:
+  Label <name>: Accuracy=<percent>%, (<correct> / <total>)
+
+============================================================
 ```
 
 ### 命令行参数
 
 **必需参数：**
 - `--model_path`：模型检查点路径
-- `--template_file`：模板文件路径
+- `--template_path`：模板文件或目录路径
 - `--test_file`：测试文件路径
 
 **可选参数：**
-- `--output_dir`：输出目录（默认：`eval_open_output`）
+- `--output_dir`：输出目录（默认：`eval_output`）
 - `--device`：设备（`cuda` 或 `cpu`，默认：`cuda`）
 - `--top_k`：最近邻数量（默认：5）
 - `--threshold`：绝对相似度阈值（默认：0.6）
 - `--margin_threshold`：相对增益阈值（默认：0.1）
 - `--outlier_threshold`：离群点判定阈值（默认：2.0）
+- `--batch_size`：批量推理大小（默认：32）
+- `--save_vis`：保存可视化结果（默认关闭）
 
 ## 设计决策与原理
 
@@ -224,8 +232,7 @@ Image: <path>
 ### 为什么使用加权投票而非简单投票？
 
 1. **相似度权重**：距离更近的样本更可靠
-2. **排名权重**：Top-1 的贡献应该最大
-3. **类别大小归一化**：防止样本量多的类别压制样本量少的类别
+2. **类别大小归一化**：防止样本量多的类别压制样本量少的类别
 
 ### 为什么使用双阈值判定？
 
@@ -236,7 +243,7 @@ Image: <path>
 
 ### 内部依赖
 - `train_dinov2_arcface_small.py`：`DinoV2Embedder`、`build_val_tfm`
-- `tools/eval.py`：`load_test_file`、`calculate_metrics`
+- `tools/eval.py`：`load_test_file`、`visualize_results`
 
 ### 外部依赖
 - `torch`：PyTorch 深度学习框架

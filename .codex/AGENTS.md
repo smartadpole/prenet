@@ -380,6 +380,147 @@ When I ask you to create a new Python file, generates the content starting with:
     - Do not omit this header in new Python files.
     - Ensure strict indentation and spacing as shown in the example.
 
+## Cursor rule: logging.mdc
+
+
+# Print-based Logging Rule (Authoring + Refactor)
+
+## 0) Ground truth (project standard)
+- The project uses a custom logging module that overrides `builtins.print`.
+- Therefore:
+  - `print("msg")` is allowed and means DEBUG.
+  - Use `print("msg", level="INFO|WARNING|ERROR|CRITICAL|TIME")` for higher-level logs.
+- Severity must be represented ONLY by `level=...`.
+
+---
+
+## 1) MUST: Only use patched `print` for logging
+### Allowed
+- `print(...)`
+- `print(..., level="...")`
+
+### Forbidden (in application/business code)
+- `logging.*` calls
+- `loguru`, `structlog`, `rich.logging`, `absl.logging`
+- `warnings.warn`, `traceback.print_exc`, `sys.stderr.write`
+- Any wrapper that bypasses `print(..., level=...)`
+
+---
+
+## 2) MUST: NO severity/status prefix in message text (highest priority)
+Message text must NEVER contain severity hints such as:
+- Chinese: `[警告]`, `【警告】`, `警告:`, `警告：`, `[错误]`, `错误:`, `[信息]`, `信息:`
+- English: `[INFO]`, `[WARNING]`, `[ERROR]`, `[CRITICAL]`, `INFO:`, `WARNING:`, `ERROR:`, `CRITICAL:`
+- Any case variants: `[warning]`, `error:`, etc.
+
+### Rule of thumb
+- Message text: describe WHAT happened
+- `level`: describes HOW severe it is
+- Do NOT duplicate severity in both.
+
+---
+
+## 3) MANDATORY AUTO-FIX (applies to BOTH new and existing code)
+If any `print(...)` message contains a severity prefix/hint, you MUST remove it.
+
+### Canonical rewrites (MUST follow)
+#### Example A (f-string)
+Before:
+```python
+print(f"[警告] 加载图片失败 {img_path}: {e}", level="warning")
+````
+
+After:
+
+```python
+print(f"加载图片失败 {img_path}: {e}", level="WARNING")
+```
+
+#### Example B (plain string)
+
+Before:
+
+```python
+print("[INFO] start training", level="INFO")
+```
+
+After:
+
+```python
+print("start training", level="INFO")
+```
+
+#### Example C (english prefix + lowercase level)
+
+Before:
+
+```python
+print(f"ERROR: failed to load {path}", level="error")
+```
+
+After:
+
+```python
+print(f"failed to load {path}", level="ERROR")
+```
+
+### Rewrite constraints
+
+1. Delete the prefix; do NOT translate it into another prefix.
+2. Do NOT add new prefix words like "警告：" or "WARNING:".
+3. Keep semantics intact (do not drop important info like path/exception).
+4. Normalize `level` to UPPERCASE: `INFO|WARNING|ERROR|CRITICAL|TIME`.
+5. If message already has correct `level`, keep it; only strip the text prefix.
+
+---
+
+## 4) Level selection rubric (for upgrades / conversions)
+
+* DEBUG: default `print("...")`, verbose internal details.
+* INFO: milestones / state transitions / summaries.
+* WARNING: abnormal but recoverable / fallback / retry / skip.
+* ERROR: failure / exception caught / operation failed.
+* CRITICAL: unrecoverable / must abort.
+* TIME: duration / latency / profiling.
+
+---
+
+## 5) REFRACTOR MODE (Mandatory when touching existing files)
+
+Whenever you edit an existing Python file, you MUST also scan and fix legacy logs in that file:
+
+### 5.1 What to scan
+
+* Any `print(` call whose first arg (string or f-string) contains:
+
+  * `[` `]` with INFO/WARNING/ERROR/CRITICAL/警告/错误/信息
+  * prefixes like `INFO:` `WARNING:` `ERROR:` `警告:` `错误:`
+
+### 5.2 What to do
+
+* Strip the prefix from the message text (see section 3).
+* Ensure `level` exists and is correct (if missing and not DEBUG).
+* Normalize level to uppercase string.
+
+### 5.3 Non-goals
+
+* Do NOT change business logic.
+* Do NOT change exception handling behavior.
+* Only logging statements are modified.
+
+---
+
+## 6) Definition of "done" (MUST pass)
+
+* In any modified file:
+
+  * No `print(...)` message contains severity/status prefixes.
+  * No other logging systems are used.
+  * `print(..., level=...)` uses uppercase level strings.
+  * Plain `print(...)` remains allowed and treated as DEBUG.
+
+```
+
 ## Cursor rule: no-repeat.mdc
 
 

@@ -32,6 +32,34 @@
 
 ---
 
+### REQ-002: 开集评估输入输出与 eval 对齐并支持模板目录
+
+| 项目 | 内容 |
+|------|------|
+| **ID** | REQ-002 |
+| **Source** | 用户要求开集评估输入输出与 `eval.py` 保持一致，只新增 SKU 模板输入；模板支持文件列表和目录两种；输出配置与可视化与闭集 eval 对齐，未知预测计为错误并标记为 Unknown/Rejected。 |
+| **Requirement** | 1) `eval_open.py` 支持 `--template_path` 输入模板，兼容 `.txt/.csv` 三列文件与目录子文件夹两种格式；2) 目录模式下按子目录名作为类别名并自动分配 label_id；3) 评估输出文件与 `eval.py` 一致（`evaluation_results.txt` + 按类可视化）；4) 预测为未知类时计入错误并在可视化中标记为 `Unknown/Rejected`；5) 保持 Top-K 投票使用相似度与类别规模归一化的权重公式。 |
+| **Design Strategy** | 复用 `eval.py` 的 `load_test_file` 与 `visualize_results`，新增 `load_template_data` 支持文件/目录两种模板输入。引入 `calculate_metrics_with_unknown` 将未知预测纳入总数并计为错误，保持评估输出格式与 `eval.py` 一致。投票权重仅使用相似度与 `log(N_c+1)` 归一化，去除 rank 权重以符合公式要求。 |
+| **Implementation** | `tools/eval_open.py`: 新增 `load_template_data`/`calculate_metrics_with_unknown`，支持 `--template_path`，输出对齐 `evaluation_results.txt` 与可视化；`docs/dev/eval_open_set.md`: 更新输入格式、投票公式、输出一致性说明。 |
+| **Version** | 0.1.20 |
+| **Coherence** | 与闭集 `eval.py` 保持同样的输出格式与可视化流程，仅增加模板输入与开集拒识逻辑；不影响现有闭集工具。 |
+
+---
+
+### REQ-003: 开集评估支持可控可视化与模板库缓存
+
+| 项目 | 内容 |
+|------|------|
+| **ID** | REQ-003 |
+| **Source** | 用户要求可视化结果通过参数控制是否保存、功能封装、模板库默认缓存。 |
+| **Requirement** | 1) 增加参数控制是否保存可视化结果，默认保持可视化输出；2) 模板库默认开启缓存，支持禁用开关与指定缓存目录；3) 抽取评估结果与可视化保存逻辑为可复用函数。 |
+| **Design Strategy** | 在 `eval_open.py` 中新增 `--save_vis` 参数，默认启用缓存但关闭可视化；通过封装 `_write_evaluation_results`、`_save_visualizations` 等函数减少主流程重复；模板库缓存基于模板指纹与模型路径生成 key，缓存特征与标签信息，缓存目录与模板目录同级并按模型版本区分。 |
+| **Implementation** | `tools/eval_open.py`: 新增缓存与可视化开关参数、缓存读写函数、评估结果与可视化输出封装；`README.md` 与 `docs/user/eval_open_set.md`、`docs/dev/eval_open_set.md`: 补充参数说明与默认行为。 |
+| **Version** | 0.1.20 |
+| **Coherence** | 保持现有评估输出结构与逻辑一致，仅添加可选行为控制与缓存层；不影响无缓存或关闭可视化时的评估统计。 |
+
+---
+
 ## 冲突与替代记录
 
 （当某需求被后续需求替代时，在此标记并链接新需求 ID。）

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.20 - 2026/01/29 14:35 (smartadpole)
+Align open-set evaluation output with eval format
+
+- 新增：`tools/eval_open.py` 新增 `--template_path`，兼容文件列表与目录模板输入
+- 变更：`eval_open.py` 评估输出对齐 `eval.py`（`evaluation_results.txt` 与按类可视化）
+- 修复：开集评估将未知预测计入总数并视为错误，避免准确率偏高
+- 变更：`eval_open.py` 加权投票改为相似度与 `log(N_c + 1)` 归一化的公式实现
+- 优化：更新 `docs/dev/eval_open_set.md` 与 `README.md` 的开集评估说明
+- 新增：`eval_open.py` 支持批量推理（`--batch_size`），提升评估速度
+- 优化：`eval_open.py` 输出统一使用带级别的日志打印（info/warning/error）
+- 新增：`eval_open.py` 支持模板库缓存（默认开启），与模板目录同级并按模型版本区分
+- 新增：`eval_open.py` 可通过 `--save_vis` 控制是否保存可视化结果（默认关闭）
+- 优化：抽取评估结果与可视化输出的封装函数，减少主流程重复逻辑
+- 变更：移除 `--no_cache`、`--no_save_vis` 参数，缓存默认启用、可视化仅通过 `--save_vis` 开启
+- 变更：开集评估准确率以类别标签名进行对比，避免依赖 ID
+- 优化：移除开集评估中无用的状态日志输出并统一日志文案
+
 ## 0.1.19 - 2026/01/29 12:00 (smartadpole)
 Auto-cleanup temp dirs and sync docs with code
 
@@ -228,4 +245,3 @@ Improve data loader flexibility and command-line interface
 - 变更：`main.py` 中 `--train_path` 和 `--test_path` 参数改为可选，支持自动发现数据文件
 - 变更：`main.py` 中 `--dataset` 默认值改为 `other`，`--image_path` 和 `--weight_path` 改为必需参数
 - 新增：`data_loader.py` 中添加 `use_absolute_path` 参数支持灵活的路径处理方式
-

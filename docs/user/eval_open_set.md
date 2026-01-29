@@ -49,7 +49,7 @@ pip install torch torchvision pillow numpy tqdm
 ```bash
 python tools/eval_open.py \
     --model_path <模型检查点路径> \
-    --template_file <模板文件路径> \
+    --template_path <模板路径> \
     --test_file <测试文件路径>
 ```
 
@@ -58,14 +58,16 @@ python tools/eval_open.py \
 | 参数 | 类型 | 必需 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | `--model_path` | str | 是 | - | 模型检查点文件路径（.pt 文件） |
-| `--template_file` | str | 是 | - | 模板文件路径（用于构建特征库） |
+| `--template_path` | str | 是 | - | 模板文件或目录路径（用于构建特征库） |
 | `--test_file` | str | 是 | - | 测试文件路径 |
-| `--output_dir` | str | 否 | `eval_open_output` | 结果输出目录 |
+| `--output_dir` | str | 否 | `eval_output` | 结果输出目录 |
 | `--device` | str | 否 | `cuda` | 推理设备（`cuda` 或 `cpu`） |
 | `--top_k` | int | 否 | 5 | Top-K 最近邻数量 |
 | `--threshold` | float | 否 | 0.6 | 绝对相似度阈值（用于判定未知类） |
 | `--margin_threshold` | float | 否 | 0.1 | 相对增益阈值（Top-1 与 Top-2 的差值） |
 | `--outlier_threshold` | float | 否 | 2.0 | 离群点判定阈值（倍数标准差） |
+| `--batch_size` | int | 否 | 32 | 批量推理大小 |
+| `--save_vis` | flag | 否 | - | 保存可视化结果（默认关闭） |
 
 ### 文件格式
 
@@ -83,6 +85,17 @@ python tools/eval_open.py \
 /path/to/template2.jpg 0 类别A
 /path/to/template3.jpg 1 类别B
 /path/to/template4.jpg 1 类别B
+```
+
+#### 模板目录格式
+
+```
+<template_root>/
+├── <类别名称1>/
+│   ├── img1.jpg
+│   └── ...
+└── <类别名称2>/
+    └── ...
 ```
 
 #### 测试文件格式
@@ -107,7 +120,7 @@ python tools/eval_open.py \
 ```bash
 python tools/eval_open.py \
     --model_path output/best_val_model.pt \
-    --template_file data/templates.txt \
+    --template_path data/templates.txt \
     --test_file data/test_open_set.txt
 ```
 
@@ -116,7 +129,7 @@ python tools/eval_open.py \
 ```bash
 python tools/eval_open.py \
     --model_path output/best_val_model.pt \
-    --template_file data/templates.txt \
+    --template_path data/templates.txt \
     --test_file data/test_open_set.txt \
     --threshold 0.65 \
     --margin_threshold 0.15 \
@@ -128,7 +141,7 @@ python tools/eval_open.py \
 ```bash
 python tools/eval_open.py \
     --model_path output/best_val_model.pt \
-    --template_file data/templates.txt \
+    --template_path data/templates.txt \
     --test_file data/test_open_set.txt \
     --device cpu
 ```
@@ -138,7 +151,7 @@ python tools/eval_open.py \
 ```bash
 python tools/eval_open.py \
     --model_path output/best_val_model.pt \
-    --template_file data/templates.txt \
+    --template_path data/templates.txt \
     --test_file data/test_open_set.txt \
     --output_dir my_eval_results
 ```
@@ -178,7 +191,6 @@ python tools/eval_open.py \
 - 特征库构建进度和统计信息
 - 测试评估进度
 - 总体和分类别准确率统计
-- 未知类判定数量
 
 示例输出：
 ```
@@ -195,29 +207,30 @@ python tools/eval_open.py \
 测试进度: 100%|████████████| 200/200 [00:10<00:00, 19.45it/s]
 
 ============================================================
-开集识别评估结果
+Evaluation Results
 ============================================================
-总体准确率: 0.8750 (87.50%)
-总体: 正确=175, 错误=25, 总数=200
-未知类判定: 15 个样本被判定为未知类
-
-分类别准确率:
-  类别 0 (类别A): 准确率=90.00%, (18 / 20)
-  类别 1 (类别B): 准确率=85.00%, (17 / 20)
+Overall Accuracy: 0.8750 (87.50%)
+Overall: Correct=175, Wrong=25, Total=200
+Per-Class Accuracy:
+  Label 类别A: Accuracy=90.00%, (18 / 20)
+  Label 类别B: Accuracy=85.00%, (17 / 20)
   ...
 ============================================================
 ```
 
 ### 结果文件
 
-结果保存在 `--output_dir` 指定的目录中，文件名为 `open_set_results.txt`，包含：
-- 评估配置信息（模板文件、测试文件、阈值参数）
-- 每个样本的详细结果：
-  - 图片路径
-  - 真实标签和预测标签
-  - 置信度分数
-  - 是否正确
-  - 是否被判定为未知类
+结果保存在 `--output_dir` 指定的目录中，文件名为 `evaluation_results.txt`，包含：
+- 总体准确率、正确数、错误数、总数
+- 分类别准确率统计
+- 未知预测计入错误统计
+
+此外可通过 `--save_vis` 生成按类别可视化图像：
+- Top 10 正确样本（按置信度排序）
+- 所有错误样本（包含真实/预测标签）
+- 未知预测标记为 `Unknown/Rejected`
+
+模板库默认启用缓存，缓存目录为模板目录同级的 `gallery_cache_<模型版本号>`；可视化默认关闭。
 
 ## 常见问题
 

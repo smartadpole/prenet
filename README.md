@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.19
+**Version:** 0.1.20
 
 ### Introduction
 ![method](Method.png)
@@ -246,42 +246,56 @@ To evaluate model with open-set recognition using offline feature gallery:
 ```bash
 python tools/eval_open.py \
     --model_path <checkpoint_path> \
-    --template_file <template_file> \
+    --template_path <template_path> \
     --test_file <test_file> \
     [OPTIONS]
 ```
 
 **Required Parameters:**
 - `--model_path`: Path to model checkpoint (.pt file)
-- `--template_file`: Path to template file (.txt) for building feature gallery
+- `--template_path`: Path to template file (.txt/.csv) or directory for building feature gallery
 - `--test_file`: Path to test file (.txt) with ground truth labels
 
 **File Format:**
-Both template and test files should contain three columns per line (space or tab separated):
+Template and test files should contain three columns per line (space/tab/comma separated):
 ```
 <absolute_image_path> <label_id> <class_name>
 ```
 
+**Template Directory Format:**
+```
+<template_root>/
+├── <label_name_1>/
+│   ├── img1.jpg
+│   └── ...
+└── <label_name_2>/
+    └── ...
+```
+
 **Optional Parameters:**
-- `--output_dir`: Output directory for results (default: `eval_open_output`)
+- `--output_dir`: Output directory for results (default: `eval_output`)
 - `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
 - `--top_k`: Number of nearest neighbors for voting (default: 5)
 - `--threshold`: Absolute similarity threshold for open-set rejection (default: 0.6)
 - `--margin_threshold`: Margin threshold between top-1 and top-2 scores (default: 0.1)
 - `--outlier_threshold`: Outlier removal threshold in standard deviations (default: 2.0)
+- `--batch_size`, `-b`: Batch size for inference (default: 32)
+- `--save_vis`: Save visualization images (default: disabled)
 
 **Features:**
 - Offline feature gallery construction from template images
 - Top-K nearest neighbor search with weighted voting
 - Class imbalance handling using size normalization
 - Dual-threshold open-set rejection (absolute + relative)
-- Unknown class detection and statistics
+- Unknown class detection with error counting in metrics
+- Template gallery cache stored next to the template directory as `gallery_cache_<model_version>`
 
 **Output:**
-- Text file with detailed evaluation results (`open_set_results.txt`)
-- Overall accuracy and per-class accuracy statistics
-- Unknown class detection count
-- Individual sample results with confidence scores
+- Text file with accuracy metrics (`evaluation_results.txt`)
+- Optional visualization images per class (enabled with `--save_vis`) showing:
+  - Top 10 correct predictions (by confidence)
+  - All wrong predictions with true and predicted labels
+  - Unknown predictions marked as `Unknown/Rejected`
 
 **Key Differences from Closed-Set Evaluation:**
 - Uses metric learning instead of classification head
@@ -385,4 +399,3 @@ If you find this repo useful to your project, please consider to cite it with fo
   year={2021}
 }
 ```
-
