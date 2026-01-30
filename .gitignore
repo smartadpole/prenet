@@ -40,7 +40,6 @@ Thumbs.db
 analysis_results.json
 *.log
 .fuse_hidden*
-data/
 
 # Streamlit
 .streamlit/
