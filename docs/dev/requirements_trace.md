@@ -60,6 +60,34 @@
 
 ---
 
+### REQ-004: test_full 支持开集检索与可控 Unknown 输出
+
+| 项目 | 内容 |
+|------|------|
+| **ID** | REQ-004 |
+| **Source** | 用户要求 `test_full.py` 兼容闭集与开集检索，支持通过模板库检索；开集检索支持受限类别；默认不输出 Unknown，仅在参数启用时输出。 |
+| **Requirement** | 1) `test_full.py` 增加 `--template_path` 以启用开集检索并复用模板库；2) 开集检索支持 `--label_file` 受限类别，未提供或无效时检索全部；3) 新增 `--allow_unknown` 控制是否输出 `Unknown/Rejected`；4) 保持闭集模式不受影响。 |
+| **Design Strategy** | 复用 `eval_open.py` 的 `OpenSetEvaluator`，通过 `--template_path` 决定闭集/开集分支；开集模式按模板库 `label_id → class_name` 映射进行类别过滤；当 `--allow_unknown` 关闭时禁用阈值拒识，保证稳定输出；对无效标签文件或无交集情况回退为全量检索。 |
+| **Implementation** | `tools/test_full.py`: 新增 `--template_path`、开集检索分支、受限类别过滤、`--allow_unknown`；`README.md` 与 `docs/dev/test_full.md`: 更新参数与流程说明；CHANGELOG 0.1.21。 |
+| **Version** | 0.1.21 |
+| **Coherence** | 与 `eval_open.py` 的开集逻辑一致，仅在 CLI 分支中引入检索路径；闭集路径与已有分类流程保持兼容。 |
+
+---
+
+### REQ-005: test_full 参数命名去重
+
+| 项目 | 内容 |
+|------|------|
+| **ID** | REQ-005 |
+| **Source** | 用户要求 `temp_dir` 与 `temp_save_dir` 命名过于接近，需要整体调整为更清晰的参数名。 |
+| **Requirement** | 1) 将裁剪临时目录参数重命名为 `--crop_dir`；2) 将按类别保存目录参数重命名为 `--save_dir`；3) 脚本与文档同步更新，避免歧义。 |
+| **Design Strategy** | 保持功能不变，仅调整 CLI 命名；文档与脚本统一新名称，确保使用体验一致。 |
+| **Implementation** | `tools/test_full.py`: 更新 CLI 参数与字段名；`scripts/batch_test_full_140.sh`: 新增 `--crop_dir` 并传递到脚本；`README.md` 与 `docs/dev/test_full.md`: 参数说明与流程描述更新；CHANGELOG 0.1.21。 |
+| **Version** | 0.1.21 |
+| **Coherence** | 与既有临时目录与保存目录逻辑保持一致，仅消除参数命名歧义，不影响业务流程。 |
+
+---
+
 ## 冲突与替代记录
 
 （当某需求被后续需求替代时，在此标记并链接新需求 ID。）

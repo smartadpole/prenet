@@ -21,9 +21,10 @@ test_full.py
 ├── 可视化模块
 │   └── visualize_image_with_bbox()  # 在原始图片上绘制 bbox、标签和置信度
 ├── 推理模块（复用）
-│   ├── load_model()          # 从 eval.py 导入
-│   ├── classify_batch()      # 从 eval.py 导入（支持 allowed_indices 类别过滤）
-│   └── build_val_tfm()       # 从 eval.py 导入
+│   ├── load_model()          # 从 eval.py 导入（闭集）
+│   ├── classify_batch()      # 从 eval.py 导入（闭集，支持 allowed_indices 类别过滤）
+│   ├── build_val_tfm()       # 从 eval.py 导入（闭集）
+│   └── OpenSetEvaluator()    # 从 eval_open.py 导入（开集检索）
 └── 主程序
     └── main()
 ```
@@ -37,7 +38,9 @@ CSV 文件 → 读取所有行
     ↓
 保存到临时目录 → collect_all_images() → 收集所有任务
     ↓
-批量推理 (batch_size) → classify_batch() → 批量分类结果
+批量推理 (batch_size)
+    ├── 闭集：classify_batch() → 批量分类结果
+    └── 开集：OpenSetEvaluator._predict_batch() → 检索结果（可选 Unknown）
     ↓
 映射结果回 DataFrame → 添加 8 列结果 → 输出 CSV 文件
 ```
@@ -143,14 +146,34 @@ CSV 文件 → 读取所有行
 - **加载阶段**：只显示图像和检测框（`show_label=False`），用于检查 bbox 是否正确
 - **测评阶段**：显示图像、检测框、标签和置信度（`show_label=True`），用于查看分类结果
 
-### 5. 类别名称映射
+### 5. 开集检索模式（`--template_path`）
+
+**职责：** 在批量推理中启用开集检索模式，基于模板库做特征检索与投票。
+
+**触发条件：**
+- 当 `--template_path` 传入有效路径时，进入开集检索模式；
+- 未传入时保持闭集分类模式。
+
+**实现细节：**
+- 使用 `OpenSetEvaluator` 构建模板库（`build_gallery_cached`），复用 `eval_open.py` 的模板解析与缓存逻辑。
+- 检索采用 Top-K 近邻投票（`_predict_batch`），支持绝对阈值与 margin 阈值。
+- `--allow_unknown` 未启用时，阈值逻辑被关闭，确保每张图像都输出类别与置信度。
+- `--allow_unknown` 启用时，拒识样本输出 `Unknown/Rejected`。
+
+**受限类别检索：**
+- 未传入 `--label_file` 或标签文件为空/无效时：检索全部模板类别。
+- 当 `--label_file` 有效时：仅在标签文件列出的类别中检索。
+- 若标签文件与模板库无交集：回退为检索全部模板类别，并打印告警。
+
+### 6. 类别名称映射
 
 **职责：** 将预测的类别ID转换为类别名称
 
 **实现细节：**
-- 复用 `test_dinov2_classification.load_label_file` 函数
-- 支持从标签文件加载类别名称映射
+- 闭集模式：复用 `test_dinov2_classification.load_label_file` 函数
+- 开集模式：使用模板库中 `label_id → class_name` 的映射
 - 如果类别ID不在映射中，使用 `Class_{id}` 作为回退
+- 开集拒识且启用 `--allow_unknown` 时输出 `Unknown/Rejected`
 
 **标签文件格式：**
 ```
@@ -162,7 +185,7 @@ label_id class_name
 
 支持制表符或空格分隔。
 
-### 6. 文件名生成 (`generate_saved_filename`)
+### 7. 文件名生成 (`generate_saved_filename`)
 
 **职责：** 根据视频名、帧号和帧类型生成保存的文件名
 
@@ -183,19 +206,20 @@ label_id class_name
 - 如果找不到视频名，使用 `unknown_video` 作为默认值
 - 如果找不到帧号，使用 `none` 作为默认值
 
-### 7. 按类别保存图片
+### 8. 按类别保存图片
 
 **职责：** 将裁剪后的图片按预测类别保存到指定目录
 
 **实现细节：**
-- 如果指定 `--temp_save_dir` 参数，会在该目录下创建以模型版本命名的子目录
+- 如果指定 `--save_dir` 参数，会在该目录下创建以模型版本命名的子目录
 - 在每个版本目录下，按类别名称创建子目录
+- 类别目录名会做非法字符清理，避免 Windows 路径错误
 - 使用 `generate_saved_filename` 生成文件名，包含视频名、帧号和帧类型信息
 - 从临时目录复制裁剪后的图片到对应的类别目录
 
 **目录结构：**
 ```
-{temp_save_dir}/
+{save_dir}/
   └── {model_version}/
       ├── {class_name_1}/
       │   ├── video1_123_取走目标的第一帧.jpg
@@ -222,6 +246,7 @@ tqdm            # 进度条显示
 eval.load_model                    # 模型加载
 eval.classify_batch                # 批量推理
 eval.build_val_tfm                 # 图像变换管道
+eval_open.OpenSetEvaluator         # 开集检索与模板库构建
 test_dinov2_classification.load_label_file  # 类别名称加载
 utils.logger.logger_manager       # 日志管理
 utils.file.mkdir_simple           # 目录创建工具
@@ -315,12 +340,18 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 --suffix         # 输出 CSV 文件后缀名（可选，默认：label），输出文件名为 {input_csv_basename}_{suffix}.csv
 --model_path     # 模型检查点文件路径（必需）
 --label_file     # 类别名称映射文件路径（可选）
+--template_path  # 模板文件或目录路径（可选，启用开集检索）
 --base_dir       # 图片基础目录（可选，默认：输入 CSV 文件所在目录）
 --device         # 推理设备：cuda 或 cpu（默认：cuda）
 --batch_size     # 批量推理大小（默认：32）
---temp_dir       # 临时文件目录（可选，默认：None；未指定时使用输入 CSV 所在目录下的 temp_cropped 子目录，处理结束后自动删除）
---temp_save_dir  # 按类别保存裁剪图片的目录（可选）
+--crop_dir       # 临时文件目录（可选，默认：None；未指定时使用输入 CSV 所在目录下的 temp_cropped 子目录，处理结束后自动删除）
+--save_dir  # 按类别保存裁剪图片的目录（可选）
 --visualize      # 是否进行可视化（默认：False）。启用后会在加载阶段和测评阶段实时显示图像
+--top_k          # 开集检索 Top-K 近邻数（默认：5）
+--threshold      # 开集绝对相似度阈值（默认：0.6）
+--margin_threshold # 开集 Top-1 与 Top-2 的间隔阈值（默认：0.1）
+--outlier_threshold # 开集模板离群点清理阈值（默认：2.0）
+--allow_unknown  # 开集是否允许输出 Unknown/Rejected（默认：False）
 ```
 
 ### 输入 CSV 格式
@@ -356,32 +387,35 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 1. **初始化阶段**
    - 解析命令行参数
    - 设置设备（CUDA/CPU）
-   - 加载类别名称映射（如果提供）；若存在有效类别名则计算 `allowed_indices`，推理时仅预测这些类别（过滤模式）
-   - 加载模型和构建变换管道
+   - 若未指定 `--template_path`：加载类别名称映射；若存在有效类别名则计算 `allowed_indices`，推理时仅预测这些类别（闭集过滤模式）
+   - 若指定 `--template_path`：构建模板库并进入开集检索模式；如提供有效 `--label_file` 则限制检索类别，否则检索全部模板类别
+   - 闭集模式加载模型与变换管道；开集模式复用模板库并跳过分类头
 
 2. **数据读取阶段**
    - 读取输入 CSV 文件
    - 验证必需列是否存在
 
 3. **图片处理阶段**
-   - 若未指定 `--temp_dir`，临时目录设为输入 CSV 所在目录下的 `temp_cropped` 子目录；否则使用指定路径
+   - 若未指定 `--crop_dir`，临时目录设为输入 CSV 所在目录下的 `temp_cropped` 子目录；否则使用指定路径
    - 遍历所有行，收集需要处理的图片
    - 批量裁剪图片并保存到临时目录
    - 统计成功和失败的任务
 
 4. **批量推理阶段**
    - 按 `batch_size` 分批处理所有裁剪后的图片
-   - 调用 `classify_batch(..., allowed_indices=allowed_indices)` 进行批量推理（过滤模式下仅预测 label_file 中定义的类别）
+   - 闭集：调用 `classify_batch(..., allowed_indices=allowed_indices)` 进行批量推理
+   - 开集：调用 `OpenSetEvaluator._predict_batch()` 进行批量检索
+   - 未启用 `--allow_unknown` 时关闭拒识阈值，确保输出类别与置信度
    - 显示进度条
 
 5. **结果映射阶段**
    - 将推理结果映射回原始 DataFrame
-   - 使用类别名称映射将类别ID转换为名称
+   - 使用类别名称映射将类别ID转换为名称，开集拒识时可输出 `Unknown/Rejected`
    - 处理失败的任务（设置为 None）
-   - 如果指定 `--temp_save_dir`，按类别保存裁剪后的图片
+   - 如果指定 `--save_dir`，按类别保存裁剪后的图片
 
 6. **按类别保存阶段**（可选）
-   - 如果启用 `--temp_save_dir` 参数，为每张成功分类的图片按类别保存
+   - 如果启用 `--save_dir` 参数，为每张成功分类的图片按类别保存
    - 使用 `generate_saved_filename` 生成包含视频名、帧号和帧类型的文件名
    - 从临时目录复制图片到对应的类别目录
 
@@ -396,7 +430,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
    - 根据 `--suffix` 参数自动生成输出 CSV 文件名（格式：`{input_csv_basename}_{suffix}.csv`）
    - 将结果保存到输出 CSV 文件
    - 使用 UTF-8-BOM 编码确保 Excel 正确显示中文
-   - 删除临时裁剪目录（`temp_dir`），释放磁盘空间
+   - 处理完成后删除临时裁剪目录（`temp_dir`），释放磁盘空间
 
 ## 设计决策
 
@@ -409,6 +443,23 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 2. **一致性：** 确保推理逻辑与评估脚本完全一致
 3. **可维护性：** 如果推理逻辑需要更新，只需修改一处
 4. **类别过滤：** 使用 `--label_file` 时，将有效类别索引作为 `allowed_indices` 传入 `classify_batch`，预测仅在该子集内取 argmax，避免模型输出头大于标签集时的越界或无关类别被选中。
+
+### 为什么在 test_full 中引入开集检索模式？
+
+**决策：** 当提供 `--template_path` 时，切换为开集检索，复用 `eval_open.py` 的模板库与检索逻辑。
+
+**理由：**
+1. **一致性：** 复用 `OpenSetEvaluator` 保证检索逻辑与开集评估一致
+2. **扩展性：** 模板库可动态更新，无需重新训练分类头
+3. **兼容性：** 不传入 `--template_path` 时保持原有闭集流程不变
+
+### 为什么默认不输出 Unknown？
+
+**决策：** 开集检索默认关闭拒识阈值，仅在启用 `--allow_unknown` 时输出 `Unknown/Rejected`。
+
+**理由：**
+1. **稳定性：** 默认行为与闭集推理一致，始终输出类别与置信度
+2. **可控性：** 只有显式开启时才引入拒识逻辑，避免误拒识影响结果
 
 ### 为什么先收集所有图片再批量推理？
 
@@ -430,7 +481,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 
 ### 为什么按类别保存图片？
 
-**决策：** 提供 `--temp_save_dir` 参数，支持按预测类别保存裁剪后的图片。
+**决策：** 提供 `--save_dir` 参数，支持按预测类别保存裁剪后的图片。
 
 **理由：**
 1. **数据分析：** 便于按类别查看和分析裁剪后的图片
@@ -463,7 +514,7 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
 
 ### 优化建议
 
-1. **临时文件清理：** 处理完成后会自动删除临时裁剪目录（`shutil.rmtree(temp_dir)`），无需手动清理
+1. **临时文件清理：** 无论是否指定 `--crop_dir`，处理完成后都会自动删除临时裁剪目录（`shutil.rmtree(temp_dir)`），无需手动清理
 2. **缓存机制：** 如果同一张图片被多次使用，可以缓存裁剪结果
 3. **多进程裁剪：** 对于 CPU 模式，可以使用多进程加速图片裁剪
 

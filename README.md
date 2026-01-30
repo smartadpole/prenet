@@ -2,7 +2,7 @@
 
 Code release for Large Scale Visual Food Recognition
 
-**Version:** 0.1.20
+**Version:** 0.1.21
 
 ### Introduction
 ![method](Method.png)
@@ -310,7 +310,6 @@ To perform batch inference on images with bbox cropping from CSV file:
 ```bash
 python tools/test_full.py \
     --input_csv <input_csv_path> \
-    --output_csv <output_csv_path> \
     --model_path <checkpoint_path> \
     [OPTIONS]
 ```
@@ -322,13 +321,19 @@ python tools/test_full.py \
 **Optional Parameters:**
 - `--suffix`: Output CSV file suffix name (default: `label`). Output file will be `{input_csv_basename}_{suffix}.csv`
 - `--label_file`: Path to label file (.txt) with class names (optional)
+- `--template_path`: Template file or directory for open-set retrieval (optional; when set, enable open-set mode)
 - `--base_dir`: Base directory for resolving relative image paths (default: directory of input_csv)
 - `--device`: Device to use (`cuda` or `cpu`, default: `cuda`)
 - `--batch_size`, `-b`: Batch size for inference (default: 32)
-- `--temp_dir`: Temporary directory for saving cropped images (default: None; when not specified, uses subdirectory `temp_cropped` under the input CSV directory, and the directory is removed after processing)
-- `--temp_save_dir`: Directory to save cropped images organized by category (optional)
+- `--crop_dir`: Temporary directory for saving cropped images (default: None; when not specified, uses subdirectory `temp_cropped` under the input CSV directory and removes it after processing; when specified, it is also removed after processing)
+- `--save_dir`: Directory to save cropped images organized by category (optional)
 - `--visualize`: Enable visualization of images with bbox, label and confidence (default: False)
 - `--vis_output_dir`: Output directory for visualized images (default: `visualizations`, only used if `--visualize` is set)
+- `--top_k`: Open-set only, number of nearest neighbors for voting (default: 5)
+- `--threshold`: Open-set only, absolute similarity threshold for rejection (default: 0.6)
+- `--margin_threshold`: Open-set only, margin threshold between top-1 and top-2 scores (default: 0.1)
+- `--outlier_threshold`: Open-set only, outlier removal threshold (default: 2.0)
+- `--allow_unknown`: Open-set only, allow `Unknown/Rejected` output (default: disabled)
 
 **Input CSV Format:**
 The CSV file should contain the following columns:
@@ -345,7 +350,10 @@ Bbox format: normalized coordinates "cx cy w h" (space-separated, center point +
   - `take_cross_image_label`, `take_cross_image_confidence`
   - `return_image_label`, `return_image_confidence`
   - `return_static_image_label`, `return_static_image_confidence`
-- If `--temp_save_dir` is specified, cropped images are saved organized by category (subdirectories named by class name)
+- If `--template_path` is set, the tool uses open-set retrieval with template gallery
+  - If `--label_file` is provided and valid, retrieval is restricted to those classes only
+  - If `--allow_unknown` is enabled, rejected samples are labeled as `Unknown/Rejected`
+- If `--save_dir` is specified, cropped images are saved organized by category (subdirectories named by class name)
 - If `--visualize` is enabled, visualization images are saved to the specified output directory
 
 **Visualization:**
@@ -353,6 +361,24 @@ When `--visualize` is enabled, the tool generates visualization images showing:
 - Original image with red bounding box (bbox)
 - Label text with confidence score displayed near the bbox
 - Format: `class_name: confidence` (confidence with 3 decimal places)
+
+### Batch Script for Count Results CSV
+
+The batch script scans the working directory for `*count_results.csv` files and runs `tools/test_full.py` for each file.
+
+**Example (open-set with unknown output and custom save root):**
+```bash
+cd /home/user/data/video/2026-01-01-all-stall-convert-result2-big
+bash /home/user/sunhao/CODE/prenet/scripts/batch_test_full_140.sh \
+  --template_path /home/user/data/image/classify/files/train/v1.0.5/sku \
+  --allow_unknown \
+  --save_root /home/user/sunhao/Result/20260101_openset_unknown
+```
+
+**Notes:**
+- Working directory matters: the script only searches under the current directory.
+- `--template_path` enables open-set retrieval automatically.
+- `--save_root` controls whether cropped images are saved; if empty, no images are saved.
 
 ### Template Library Generation
 

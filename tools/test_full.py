@@ -23,6 +23,7 @@ import shutil
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 from eval import load_model, classify_batch, build_val_tfm
+from eval_open import OpenSetEvaluator
 from test_dinov2_classification import load_label_file
 import chardet
 from utils.logger import logger_manager
@@ -157,7 +158,7 @@ def safe_read_file(file_path: str, file_type: str = "generic", max_size: int = N
     # Validate path
     is_valid, error_msg = validate_file_path(file_path, check_exists=check_exists, check_readable=True)
     if not is_valid:
-        print(f"[Security] {file_type} file validation failed: {error_msg}", level="error")
+        print(f"[Security] {file_type} file validation failed: {error_msg}", level="ERROR")
         return False, error_msg
 
     normalized_path = os.path.normpath(os.path.abspath(file_path))
@@ -166,17 +167,17 @@ def safe_read_file(file_path: str, file_type: str = "generic", max_size: int = N
     if allowed_extensions:
         is_valid, error_msg = validate_file_extension(normalized_path, allowed_extensions)
         if not is_valid:
-            print(f"[Security] {file_type} file extension validation failed: {error_msg}", level="error")
+            print(f"[Security] {file_type} file extension validation failed: {error_msg}", level="ERROR")
             return False, error_msg
 
     # Check file size if specified
     if max_size:
         is_valid, error_msg = validate_file_size(normalized_path, max_size)
         if not is_valid:
-            print(f"[Security] {file_type} file size validation failed: {error_msg}", level="error")
+            print(f"[Security] {file_type} file size validation failed: {error_msg}", level="ERROR")
             return False, error_msg
 
-    print(f"[Security] {file_type} file validation passed: {normalized_path}", level="debug")
+    print(f"[Security] {file_type} file validation passed: {normalized_path}", level="DEBUG")
     return True, ""
 
 
@@ -193,13 +194,13 @@ def parse_bbox(bbox_str: str, img_width: int, img_height: int):
         (x, y, w, h) in pixel coordinates (top-left corner and width/height), or None if invalid
     """
     if pd.isna(bbox_str) or not bbox_str or str(bbox_str).strip() == '':
-        print(f"[ParseBbox] Empty or NaN bbox string", level="debug")
+        print(f"[ParseBbox] Empty or NaN bbox string", level="DEBUG")
         return None
 
     try:
         parts = str(bbox_str).strip().split()
         if len(parts) < 4:
-            print(f"[ParseBbox] Invalid bbox format: '{bbox_str}' (expected 4 values, got {len(parts)})", level="debug")
+            print(f"[ParseBbox] Invalid bbox format: '{bbox_str}' (expected 4 values, got {len(parts)})", level="DEBUG")
             return None
 
         cx_norm = float(parts[0])  # Center x (normalized)
@@ -210,7 +211,7 @@ def parse_bbox(bbox_str: str, img_width: int, img_height: int):
         # Validate normalized coordinates
         if not (0 <= cx_norm <= 1 and 0 <= cy_norm <= 1 and 0 <= w_norm <= 1 and 0 <= h_norm <= 1):
             print(f"[ParseBbox] Bbox values out of range [0,1]: cx={cx_norm}, cy={cy_norm}, w={w_norm}, h={h_norm}",
-                  level="warning")
+                  level="WARNING")
 
         # Convert normalized coordinates to pixel coordinates
         cx = cx_norm * img_width  # Center x in pixels
@@ -230,7 +231,7 @@ def parse_bbox(bbox_str: str, img_width: int, img_height: int):
 
         return (x, y, w, h)
     except (ValueError, IndexError) as e:
-        print(f"[ParseBbox] Failed to parse bbox '{bbox_str}': {e}", level="warning")
+        print(f"[ParseBbox] Failed to parse bbox '{bbox_str}': {e}", level="WARNING")
         return None
 
 
@@ -248,14 +249,14 @@ def load_image(image_path: str, base_dir: str = None):
         img_path = os.path.join(base_dir, img_path)
 
     if not os.path.exists(img_path):
-        print(f"[LoadImage] Image not found: {img_path}", level="error")
+        print(f"[LoadImage] Image not found: {img_path}", level="ERROR")
         exit(1)
         return None
 
     try:
         img = Image.open(img_path).convert('RGB')
     except Exception as e:
-        print(f"[LoadImage] Failed to load image {img_path}: {e}", level="warning")
+        print(f"[LoadImage] Failed to load image {img_path}: {e}", level="WARNING")
         return None
 
     return img
@@ -303,7 +304,7 @@ def save_cropped_image(cropped_img: Image.Image, output_path: str):
         cropped_img.save(output_path)
         return True
     except Exception as e:
-        print(f"[SaveImage] Failed to save cropped image to {output_path}: {e}", level="warning")
+        print(f"[SaveImage] Failed to save cropped image to {output_path}: {e}", level="WARNING")
         return False
 
 
@@ -469,14 +470,14 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
                         display_img = img_draw.resize((new_width, new_height), Image.LANCZOS)
                     print(
                         f"[Visualize] Resized image from {img_width}x{img_height} to {new_width}x{new_height} for display",
-                        level="debug")
+                        level="DEBUG")
 
                 # Convert PIL Image to numpy array for matplotlib
                 img_array = np.array(display_img)
 
                 # Check if image is valid
                 if img_array.size == 0:
-                    print(f"Empty image array for {img_path}", level="warning")
+                    print(f"Empty image array for {img_path}", level="WARNING")
                     return img_draw
 
                 fig = plt.figure(figsize=(12, 8))
@@ -488,12 +489,12 @@ def visualize_image_with_bbox(image_path: str, bbox_str: str, label: str = None,
                 plt.pause(0.1)  # Brief pause to allow display update
                 plt.close(fig)  # Close specific figure to prevent blank windows
             except Exception as e:
-                print(f"Failed to display image: {e}", level="warning")
+                print(f"Failed to display image: {e}", level="WARNING")
 
         return img_draw
 
     except Exception as e:
-        print(f"Failed to visualize image {image_path}: {e}", level="warning")
+        print(f"Failed to visualize image {image_path}: {e}", level="WARNING")
         return None
 
 
@@ -561,6 +562,18 @@ def generate_saved_filename(row, prefix: str, video_name_col: str = None, cross_
     return filename
 
 
+def sanitize_dir_name(name: str) -> str:
+    """
+    Sanitize label for safe directory name.
+    """
+    if name is None:
+        return "unknown"
+    invalid_chars = '<>:"/\\|?*'
+    for char in invalid_chars:
+        name = name.replace(char, '_')
+    return name.strip() or "unknown"
+
+
 def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False):
     """
     Collect all images that need to be cropped and classified from the dataframe.
@@ -597,9 +610,9 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
         ('return_static_image_name', 'return_static_bbox', 'return_static'),
     ]
 
-    print(f"Collecting and cropping images from {len(df)} rows...", level="info")
-    print(f"Base directory: {base_dir}", level="info")
-    print(f"Temp directory: {temp_dir}", level="info")
+    print(f"Collecting and cropping images from {len(df)} rows...", level="INFO")
+    print(f"Base directory: {base_dir}", level="INFO")
+    print(f"Temp directory: {temp_dir}", level="INFO")
 
     for row_idx, row in tqdm(df.iterrows(), total=len(df), desc="Cropping images"):
         for img_name_col, bbox_col, prefix in image_fields:
@@ -607,7 +620,7 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
             if img_name_col not in row.index or bbox_col not in row.index:
                 failure_stats['missing_column'] += 1
                 failed_tasks.append((row_idx, prefix, 'missing_column'))
-                print(f"[Row {row_idx}, {prefix}] Missing columns: {img_name_col} or {bbox_col}", level="debug")
+                print(f"[Row {row_idx}, {prefix}] Missing columns: {img_name_col} or {bbox_col}", level="DEBUG")
                 continue
 
             img_name = row[img_name_col]
@@ -629,7 +642,7 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
             if img is None:
                 failure_stats['image_not_found'] += 1
                 failed_tasks.append((row_idx, prefix, 'image_not_found'))
-                print(f"[Row {row_idx}, {prefix}] Failed to load image: {orig_img_path}", level="debug")
+                print(f"[Row {row_idx}, {prefix}] Failed to load image: {orig_img_path}", level="DEBUG")
                 continue
 
             # Crop image
@@ -638,7 +651,7 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
                 failure_stats['bbox_parse_error'] += 1
                 failed_tasks.append((row_idx, prefix, 'bbox_parse_error'))
                 print(f"[Row {row_idx}, {prefix}] Failed to crop image: bbox='{bbox_str}', image={orig_img_path}",
-                      level="debug")
+                      level="DEBUG")
                 continue
 
             # Save cropped image temporarily
@@ -655,18 +668,18 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
             else:
                 failure_stats['save_error'] += 1
                 failed_tasks.append((row_idx, prefix, 'save_error'))
-                print(f"[Row {row_idx}, {prefix}] Failed to save cropped image: {temp_path}", level="debug")
+                print(f"[Row {row_idx}, {prefix}] Failed to save cropped image: {temp_path}", level="DEBUG")
 
     # Print detailed statistics
-    print(f"Successfully cropped {len(tasks)} images, {len(failed_tasks)} failed", level="info")
-    print("Failure statistics:", level="info")
+    print(f"Successfully cropped {len(tasks)} images, {len(failed_tasks)} failed", level="INFO")
+    print("Failure statistics:", level="INFO")
     for reason, count in failure_stats.items():
         if count > 0:
-            print(f"  {reason}: {count}", level="info")
+            print(f"  {reason}: {count}", level="INFO")
 
     # Print sample failures for debugging
     if len(failed_tasks) > 0:
-        print("Sample failures (first 10):", level="info")
+        print("Sample failures (first 10):", level="INFO")
         for i, (row_idx, prefix, reason) in enumerate(failed_tasks[:10]):
             img_name_col = f"{prefix}_image_name"
             bbox_col = f"{prefix}_bbox"
@@ -674,7 +687,7 @@ def collect_all_images(df, base_dir: str, temp_dir: str, visualize: bool = False
                 img_name = df.at[row_idx, img_name_col]
                 bbox_str = df.at[row_idx, bbox_col]
                 print(f"  Row {row_idx}, {prefix}: reason={reason}, image='{img_name}', bbox='{bbox_str}'",
-                      level="info")
+                      level="INFO")
 
     return tasks, failed_tasks
 
@@ -696,10 +709,10 @@ def read_csv_auto(
 
     try:
         if not os.path.isfile(path):
-            print("CSV file does not exist: {}".format(path), level="error")
+            print("CSV file does not exist: {}".format(path), level="ERROR")
             exit(0)
 
-        print(f"[Info] Reading CSV from {path}")
+        print(f"Reading CSV from {path}", level="INFO")
         with open(path, "rb") as f:
             raw = f.read(sample_size)
         detected = chardet.detect(raw)
@@ -708,12 +721,12 @@ def read_csv_auto(
                 e for e in encodings if e != detected["encoding"]
             )
     except Exception as e:
-        print(f"Encoding detection failed: {e}", level="error")
+        print(f"Encoding detection failed: {e}", level="ERROR")
 
     last_err = None
     for enc in encodings:
         try:
-            print(f"Trying CSV encoding: {enc}", level="debug")
+            print(f"Trying CSV encoding: {enc}", level="DEBUG")
             return pd.read_csv(path, encoding=enc, **kwargs)
         except Exception as e:
             last_err = e
@@ -735,168 +748,253 @@ def main():
     parser.add_argument("--label_file", type=str, default=None,
                         help="Path to label file. Format: label_id class_name (one per line). "
                              "If not provided, will use Class_{id} as fallback")
+    parser.add_argument("--template_path", type=str, default=None,
+                        help="Template path (file or directory). If provided, enable open-set retrieval.")
     parser.add_argument("--base_dir", type=str, default="",
                         help="Base directory for resolving relative image paths, default is the directory of input_csv")
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"],
                         help="Device to run inference on")
     parser.add_argument("--batch_size", "-b", type=int, default=32,
                         help="Batch size for inference")
-    parser.add_argument("--temp_dir", type=str, default=None,
+    parser.add_argument("--crop_dir", type=str, default=None,
                         help="Temporary directory for saving cropped images")
     parser.add_argument("--visualize", action='store_true', default=False,
                         help="Whether to visualize images with bbox, label and confidence")
     parser.add_argument("--vis_output_dir", type=str, default="visualizations",
                         help="Output directory for visualized images (only used if --visualize is set)")
-    parser.add_argument("--temp_save_dir", type=str,
+    parser.add_argument("--save_dir", type=str,
                         help="Directory to save cropped images organized by category")
+    parser.add_argument("--top_k", type=int, default=5,
+                        help="Open-set: number of nearest neighbors for voting")
+    parser.add_argument("--threshold", type=float, default=0.6,
+                        help="Open-set: absolute similarity threshold for rejection")
+    parser.add_argument("--margin_threshold", type=float, default=0.1,
+                        help="Open-set: margin threshold between top-1 and top-2 scores")
+    parser.add_argument("--outlier_threshold", type=float, default=2.0,
+                        help="Open-set: outlier removal threshold (in standard deviations)")
+    parser.add_argument("--allow_unknown", action="store_true", default=False,
+                        help="Open-set: allow unknown/rejected category when thresholding")
     args = parser.parse_args()
 
     # Setup device
     device = args.device
     if device == "cuda" and not torch.cuda.is_available():
         device = "cpu"
-        print("[Warning] CUDA not available, using CPU")
+        print("CUDA not available, using CPU", level="WARNING")
 
     version = os.path.basename(os.path.dirname(args.model_path))
     category = os.path.basename(os.path.dirname(args.input_csv))
-    print(f"-> Version: {version}, Category: {category}", level="info")
+    print(f"-> Version: {version}, Category: {category}", level="INFO")
 
-    # Load class names mapping
-    classes = load_label_file(args.label_file)
+    open_set_mode = bool(args.template_path and str(args.template_path).strip())
+    classes = None
     allowed_indices = None
-    if classes is not None:
-        allowed_indices = [i for i, name in enumerate(classes) if name is not None]
-        if len(allowed_indices) == 0:
-            print("[Warning] Label file contains no valid classes; skip class filtering")
-            allowed_indices = None
+
+    if not open_set_mode:
+        # Load class names mapping
+        classes = load_label_file(args.label_file)
+        if classes is not None:
+            allowed_indices = [i for i, name in enumerate(classes) if name is not None]
+            if len(allowed_indices) == 0:
+                print("Label file contains no valid classes; skip class filtering", level="WARNING")
+                allowed_indices = None
+            else:
+                print(f"Filter mode: restrict predictions to {len(allowed_indices)} classes", level="INFO")
+
+        # Load model (closed-set classification)
+        print(f"Loading model from {args.model_path}", level="INFO")
+        embedder, head, model_args = load_model(args.model_path, device)
+
+        # Build transform
+        img_size = model_args.get("img_size", 128)
+        transform = build_val_tfm(img_size)
+    else:
+        # Open-set retrieval: build gallery
+        print(f"Open-set mode enabled. Building gallery from {args.template_path}", level="INFO")
+        evaluator = OpenSetEvaluator(args.model_path, device=device)
+        evaluator.build_gallery_cached(
+            args.template_path,
+            outlier_threshold=args.outlier_threshold
+        )
+
+        # Optional class restriction using label file
+        classes = load_label_file(args.label_file)
+        if classes is None:
+            print("No label_file provided; search all template classes", level="INFO")
         else:
-            print(f"[Info] Filter mode: restrict predictions to {len(allowed_indices)} classes")
-
-    # Load model
-    print(f"[Info] Loading model from {args.model_path}")
-    embedder, head, model_args = load_model(args.model_path, device)
-
-    # Build transform
-    img_size = model_args.get("img_size", 128)
-    transform = build_val_tfm(img_size)
+            allowed_names = [name for name in classes if name is not None]
+            if len(allowed_names) == 0:
+                print("Label file is empty or invalid; search all template classes", level="INFO")
+            else:
+                allowed_name_set = set(allowed_names)
+                allowed_label_ids = [
+                    label_id for label_id, name in evaluator.label_to_name.items()
+                    if name in allowed_name_set
+                ]
+                if len(allowed_label_ids) == 0:
+                    print("No template classes match label_file; search all template classes", level="WARNING")
+                else:
+                    print(f"Open-set filter mode: restrict search to {len(allowed_label_ids)} classes", level="INFO")
+                    allowed_label_set = set(allowed_label_ids)
+                    mask = torch.tensor(
+                        [label in allowed_label_set for label in evaluator.gallery_labels.tolist()],
+                        device=evaluator.gallery_labels.device,
+                        dtype=torch.bool
+                    )
+                    evaluator.gallery_features = evaluator.gallery_features[mask]
+                    evaluator.gallery_labels = evaluator.gallery_labels[mask]
+                    evaluator.class_sample_counts = {}
+                    for label in evaluator.gallery_labels.tolist():
+                        evaluator.class_sample_counts[label] = evaluator.class_sample_counts.get(label, 0) + 1
 
     # Read input CSV
     try:
         df = read_csv_auto(args.input_csv)
     except Exception as e:
-        print(f"Failed to read CSV: {e}", level="error")
+        print(f"Failed to read CSV: {e}", level="ERROR")
         return
 
-    print(f"[Info] Loaded {len(df)} rows from CSV")
+    print(f"Loaded {len(df)} rows from CSV", level="INFO")
 
     # Create temp directory
-    temp_dir = os.path.join(os.path.dirname(args.input_csv), "temp_cropped") if not args.temp_dir else args.temp_dir
+    temp_dir = os.path.join(os.path.dirname(args.input_csv), "temp_cropped") if not args.crop_dir else args.crop_dir
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Step 1: Collect and crop all images
-    base_dir = args.base_dir if args.base_dir else os.path.dirname(args.input_csv)
-    tasks, failed_tasks = collect_all_images(df, base_dir, temp_dir, args.visualize)
-
-    if len(tasks) == 0:
-        print("[Warning] No images were successfully cropped. Check your CSV and image paths.")
-        return
-
-    # Step 2: Batch classify all cropped images
-    print(f"[Info] Classifying {len(tasks)} cropped images...")
-    all_image_paths = [task[2] for task in tasks]
-    all_results = []
-
-    # Process in batches
-    num_batches = (len(all_image_paths) + args.batch_size - 1) // args.batch_size
-    with tqdm(total=len(all_image_paths), desc="Classifying") as pbar:
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * args.batch_size
-            end_idx = min(start_idx + args.batch_size, len(all_image_paths))
-            batch_paths = all_image_paths[start_idx:end_idx]
-
-            batch_results = classify_batch(embedder, head, batch_paths, transform, device, allowed_indices=allowed_indices)
-            all_results.extend(batch_results)
-
-            pbar.update(len(batch_paths))
-
-    # Step 3: Map results back to dataframe
-    print(f"[Info] Mapping results back to dataframe...")
-
-    # Initialize result columns
-    result_columns = [
-        'take_first_image_label', 'take_first_image_confidence',
-        'take_cross_image_label', 'take_cross_image_confidence',
-        'return_image_label', 'return_image_confidence',
-        'return_static_image_label', 'return_static_image_confidence',
-    ]
-    for col in result_columns:
-        df[col] = None
-
-    output_csv = os.path.splitext(args.input_csv)[0] + f"_{args.suffix}.csv"
-    mkdir_simple(output_csv)
-
-    # Map successful results (using class names instead of IDs)
-    # Also save images by category if requested
-    if args.temp_save_dir:
-        temp_save_dir = os.path.join(args.temp_save_dir, version, category)
-        os.makedirs(temp_save_dir, exist_ok=True)
-        print(f"[Info] Saving cropped images by category to {args.temp_save_dir}...")
-
-    for task, (pred_class, confidence) in zip(tasks, all_results):
-        row_idx, prefix, temp_path, orig_img_path, bbox_str, row_data = task
-        if pred_class is not None:
-            # Get class name from mapping, fallback to Class_{id} if not found
-            class_name = classes[pred_class]
-            df.at[row_idx, f'{prefix}_image_label'] = class_name
-            df.at[row_idx, f'{prefix}_image_confidence'] = float(confidence)
-
-            # Visualize during evaluation phase (with bbox, label and confidence)
-            if args.visualize:
-                visualize_image_with_bbox(
-                    orig_img_path,
-                    bbox_str,
-                    label=class_name,
-                    confidence=float(confidence),
-                    base_dir=base_dir,
-                    show_label=True,
-                    display=True
-                )
-
-            # Save image by category if requested
-            if args.temp_save_dir:
-                try:
-                    # Create category directory
-                    category_dir = os.path.join(temp_save_dir, class_name)
-                    os.makedirs(category_dir, exist_ok=True)
-
-                    # Generate filename with video name, cross frame, and frame attributes
-                    saved_filename = generate_saved_filename(row_data, prefix)
-                    saved_path = os.path.join(category_dir, saved_filename)
-
-                    # Copy the cropped image to the category directory
-                    if os.path.exists(temp_path):
-                        shutil.copy2(temp_path, saved_path)
-                except Exception as e:
-                    print(f"Failed to save image by category: {e}", level="warning")
-
-    # Save output CSV
-    print(f"[Info] Saving results to {output_csv}")
     try:
-        df.to_csv(output_csv, index=False, encoding='utf-8-sig')
-        print(f"[Info] Successfully saved {len(df)} rows to {output_csv}")
-        if args.temp_save_dir:
-            temp_csv = os.path.join(temp_save_dir, os.path.basename(output_csv))
-            shutil.copy2(output_csv, temp_csv)
-            print(f"save output CSV to {temp_csv}")
-    except Exception as e:
-        print(f"Failed to save CSV: {e}", level="error")
-        return
+        # Step 1: Collect and crop all images
+        base_dir = args.base_dir if args.base_dir else os.path.dirname(args.input_csv)
+        tasks, failed_tasks = collect_all_images(df, base_dir, temp_dir, args.visualize)
 
-    # Cleanup temp directory (optional)
-    shutil.rmtree(temp_dir)
-    print(f"[Info] Cleaned up temporary directory {temp_dir}")
+        if len(tasks) == 0:
+            print("No images were successfully cropped. Check your CSV and image paths.", level="WARNING")
+            return
 
-    print("[Info] Processing completed!")
+        # Step 2: Batch classify all cropped images
+        mode_desc = "open-set retrieval" if open_set_mode else "closed-set classification"
+        print(f"Classifying {len(tasks)} cropped images with {mode_desc}...", level="INFO")
+        all_image_paths = [task[2] for task in tasks]
+        all_results = []
+
+        # Process in batches
+        num_batches = (len(all_image_paths) + args.batch_size - 1) // args.batch_size
+        with tqdm(total=len(all_image_paths), desc="Classifying") as pbar:
+            for batch_idx in range(num_batches):
+                start_idx = batch_idx * args.batch_size
+                end_idx = min(start_idx + args.batch_size, len(all_image_paths))
+                batch_paths = all_image_paths[start_idx:end_idx]
+
+                if open_set_mode:
+                    threshold = args.threshold if args.allow_unknown else -1.0
+                    margin_threshold = args.margin_threshold if args.allow_unknown else -1.0
+                    batch_results = evaluator._predict_batch(
+                        batch_paths,
+                        top_k=args.top_k,
+                        threshold=threshold,
+                        margin_threshold=margin_threshold
+                    )
+                else:
+                    batch_results = classify_batch(
+                        embedder,
+                        head,
+                        batch_paths,
+                        transform,
+                        device,
+                        allowed_indices=allowed_indices
+                    )
+                all_results.extend(batch_results)
+
+                pbar.update(len(batch_paths))
+
+        # Step 3: Map results back to dataframe
+        print("Mapping results back to dataframe...", level="INFO")
+
+        # Initialize result columns
+        result_columns = [
+            'take_first_image_label', 'take_first_image_confidence',
+            'take_cross_image_label', 'take_cross_image_confidence',
+            'return_image_label', 'return_image_confidence',
+            'return_static_image_label', 'return_static_image_confidence',
+        ]
+        for col in result_columns:
+            df[col] = None
+
+        output_csv = os.path.splitext(args.input_csv)[0] + f"_{args.suffix}.csv"
+        mkdir_simple(output_csv)
+
+        # Map successful results (using class names instead of IDs)
+        # Also save images by category if requested
+        if args.save_dir:
+            save_dir = os.path.join(args.save_dir, version, category)
+            os.makedirs(save_dir, exist_ok=True)
+            print(f"Saving cropped images by category to {args.save_dir}...", level="INFO")
+
+        for task, (pred_class, confidence) in zip(tasks, all_results):
+            row_idx, prefix, temp_path, orig_img_path, bbox_str, row_data = task
+            if pred_class is not None:
+                if open_set_mode:
+                    if pred_class == -1:
+                        if args.allow_unknown:
+                            class_name = "Unknown/Rejected"
+                        else:
+                            print("Open-set rejection occurred while unknown is disabled; skip label output", level="WARNING")
+                            continue
+                    else:
+                        class_name = evaluator.label_to_name.get(pred_class, f"Class_{pred_class}")
+                else:
+                    # Get class name from mapping, fallback to Class_{id} if not found
+                    class_name = classes[pred_class] if classes is not None and pred_class < len(classes) else f"Class_{pred_class}"
+
+                df.at[row_idx, f'{prefix}_image_label'] = class_name
+                df.at[row_idx, f'{prefix}_image_confidence'] = float(confidence)
+
+                # Visualize during evaluation phase (with bbox, label and confidence)
+                if args.visualize:
+                    visualize_image_with_bbox(
+                        orig_img_path,
+                        bbox_str,
+                        label=class_name,
+                        confidence=float(confidence),
+                        base_dir=base_dir,
+                        show_label=True,
+                        display=True
+                    )
+
+                # Save image by category if requested
+                if args.save_dir:
+                    try:
+                        # Create category directory
+                        safe_class_name = sanitize_dir_name(class_name)
+                        category_dir = os.path.join(save_dir, safe_class_name)
+                        os.makedirs(category_dir, exist_ok=True)
+
+                        # Generate filename with video name, cross frame, and frame attributes
+                        saved_filename = generate_saved_filename(row_data, prefix)
+                        saved_path = os.path.join(category_dir, saved_filename)
+
+                        # Copy the cropped image to the category directory
+                        if os.path.exists(temp_path):
+                            shutil.copy2(temp_path, saved_path)
+                    except Exception as e:
+                        print(f"Failed to save image by category: {e}", level="WARNING")
+
+        # Save output CSV
+        print(f"Saving results to {output_csv}", level="INFO")
+        try:
+            df.to_csv(output_csv, index=False, encoding='utf-8-sig')
+            print(f"Successfully saved {len(df)} rows to {output_csv}", level="INFO")
+            if args.save_dir:
+                temp_csv = os.path.join(save_dir, os.path.basename(output_csv))
+                shutil.copy2(output_csv, temp_csv)
+                print(f"Saved output CSV to {temp_csv}", level="INFO")
+        except Exception as e:
+            print(f"Failed to save CSV: {e}", level="ERROR")
+            return
+
+        print("Processing completed!", level="INFO")
+    finally:
+        if os.path.isdir(temp_dir):
+            shutil.rmtree(temp_dir)
+            print(f"Cleaned up temporary directory {temp_dir}", level="INFO")
 
 
 if __name__ == '__main__':

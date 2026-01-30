@@ -689,7 +689,8 @@ Whenever you edit an existing Python file, you MUST also scan and fix legacy log
   - Node：`package.json` 中的 `version`；
   - 其他语言：遵循项目里已有的版本字段；
 - `CHANGELOG` / `CHANGELOG.md` / `docs/CHANGELOG.md` 中最近一条版本记录的版本号
-- 规则：  
+
+- 规则：
   - 当需要更新版本时，**先读取现有版本号**，再在此基础上 PATCH+1；
   - 更新后，**包内版本字段与 changelog 中最新版本号必须完全一致**（字符串完全相同）；
 
@@ -703,7 +704,7 @@ Whenever you edit an existing Python file, you MUST also scan and fix legacy log
   - 只修改测试代码（`tests/`、`*_test.py` 等）；
   - 只修改文档（`*.md`、`docs/`）；
   - 只做格式化 / 排版调整（不改变语义）；
-- 当你判断“是否需要 bump 版本”时，遵循：  
+- 当你判断“是否需要 bump 版本”时，遵循：
   - **宁可多自增 PATCH，也不要少自增**；如果不确定，就建议自增 PATCH，并在改动说明中标记原因；
 
 ## 4. 更新版本时的具体行为
@@ -738,23 +739,37 @@ Whenever you edit an existing Python file, you MUST also scan and fix legacy log
   - **不要直接改**，而是先在回答中说明理由，并提示我确认：
     - `当前改动影响到对外 API，建议从 0.3.6 升级为 0.4.0，请确认后再执行`
 
-
 ## 6. 工作区变更控制（非常重要）
 
-# 核心原则：只有在“工作区原本干净 → 本次修改导致变脏”时，才允许自增 PATCH。
+# 核心原则（默认）：只有在“工作区原本干净 → 本次修改导致变脏”时，才允许自增 PATCH。
 # 如果工作区本来已经有修改（dirty），Cursor 不得因为继续编辑而重复升级版本。
 
 # 规则描述：
 # 1. Cursor 必须在执行版本号 bump 之前判断工作区状态：
 #    - 若 workspace 是 clean（无未提交修改），且本次操作修改了业务代码 → 允许 PATCH+1；
-#    - 若 workspace 已经是 dirty → 禁止重复 bump，同一轮开发只允许 bump 一次；
+#    - 若 workspace 已经是 dirty → 默认禁止 bump；
 # 2. 在单次编辑 Session 内，如果已经 bump 过版本号 → 禁止再次 bump，直到用户完整完成一次 commit。
+
+# ✅ 例外（为“一次性提交补齐”工作流提供出口）：
+# - 当用户在对话中 **明确授权**（例如：要求“同一 commit 内一次性补齐代码+文档+版本号+CHANGELOG”）
+#   则允许在 dirty 状态下执行 **一次** PATCH bump。
+# - 该例外必须同时满足：
+#   1) 只允许 PATCH（不得改 MAJOR/MINOR）
+#   2) 本 session 仍然最多 bump 一次
+#   3) bump 后必须同步所有版本字段 + CHANGELOG 一致
+# - 若未获得用户明确授权，仍然严格禁止 dirty 状态 bump。
 
 versionBump:
   workspace:
-    requireCleanBeforeChange: true      # 需要干净 → 修改 才能 bump
-    forbidBumpIfAlreadyDirty: true      # 工作区脏时禁止 bump
+    bumpOnlyIfDirtyIntroducedBy: [source_code, configs_affecting_build, public_api_changes]
+    requireCleanBeforeChange: true      # 默认：需要干净 → 修改 才能 bump
+    forbidBumpIfAlreadyDirty: true      # 默认：工作区脏时禁止 bump
     bumpOncePerSession: true            # 一个编辑 session 内最多 bump 一次
+  exceptions:
+    allowBumpWhenDirtyIfUserExplicitlyAuthorizes: true  # ✅ 用户明确授权时允许 dirty bump
+    stillPatchOnly: true                               # ✅ 仍然只允许 PATCH
+    stillBumpOncePerSession: true                      # ✅ session 内仍然只 bump 一次
+    requireChangelogAndAllVersionFieldsAligned: true   # ✅ 必须全处一致
 
 ## 7. 版本号更新的判定逻辑
 
@@ -762,14 +777,14 @@ versionBump:
 
 # Step 1. 判断是否修改了业务代码
 versionBump.changeTypesRequiringPatch:
-  - source_code        # *.py, *.ts, *.js, *.go, *.java, 等业务源文件
+  - source_code              # *.py, *.ts, *.js, *.go, *.java, 等业务源文件
   - configs_affecting_build  # 如 pyproject, package.json 等
   - public_api_changes
 
 # 以下修改 **不触发版本号 bump**（由用户手工控制）
 versionBump.changeTypesNotRequiringPatch:
-  - documentation      # *.md
-  - tests              # tests/*
-  - formattingOnly     # 代码格式化、黑化、排序
-  - commentsOnly       # 只改注释
+  - documentation            # *.md
+  - tests                    # tests/*
+  - formattingOnly           # 代码格式化、黑化、排序
+  - commentsOnly             # 只改注释
   - samplesOrExamples

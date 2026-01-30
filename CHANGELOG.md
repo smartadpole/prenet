@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.21 - 2026/01/30 12:20 (smartadpole)
+Add open-set retrieval controls for test_full and update docs
+
+- 新增：`tools/test_full.py` 增加开集检索模式与 `--template_path`、`--top_k`、`--threshold`、`--margin_threshold`、`--outlier_threshold` 参数
+- 新增：`tools/test_full.py` 增加 `--allow_unknown`，用于控制是否输出 `Unknown/Rejected`
+- 新增：开集检索支持基于 `--label_file` 的受限类别检索，未提供或无效时检索全部
+- 变更：开集检索默认不输出未知类，只有启用 `--allow_unknown` 才允许拒识
+- 优化：更新 `README.md`、`docs/dev/test_full.md`、`docs/dev/requirements_trace.md`、`docs/dev/README.md` 说明与版本信息
+- 重大变更：`tools/test_full.py` 参数更名为 `--crop_dir` 与 `--save_dir`，脚本与文档同步更新
+- 优化：`tools/test_full.py` 日志输出去除级别前缀并统一使用大写级别
+- 变更：`scripts/batch_test_full_140.sh` 支持 `--crop_dir` 并可传入自定义裁剪目录
+- 修复：`tools/test_full.py` 输出 CSV 保存逻辑的异常缩进问题
+- 变更：临时裁剪目录无论是否指定 `--crop_dir` 均在处理完成后清理
+- 修复：`tools/test_full.py` 主流程中途返回时临时裁剪目录未清理的问题
+
 ## 0.1.20 - 2026/01/29 14:35 (smartadpole)
 Align open-set evaluation output with eval format
 
