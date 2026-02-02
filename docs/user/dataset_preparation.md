@@ -5,7 +5,7 @@
 ## 适用场景
 - 已有图片数据集，且每个类别存放在独立目录中,并且用 `auto classify` 标注工具处理过，
 - 需要生成 `train.txt` / `val.txt` 等清单文件，供训练与评估使用,
-- 工具仅会处理所有状态为 “已处理” 的类别，详情见标注工具文档说明 [auto_classify](https://gitlab.com/tools_/autolabel)  
+- 工具仅会处理所有状态为 “已处理” 的类别，详情见标注工具文档说明 [auto_classify](http://git-app.haidilao.com/sunh8/autolabel)  
 
 可通过是否有 `.processed_folders.json` 识别是否经过标注工具处理，
 

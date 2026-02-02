@@ -139,11 +139,9 @@ This project also includes tools for training and evaluating DINOv2-based ArcFac
 To train a DINOv2 ArcFace model:
 
 ```bash
-python train_dinov2_arcface_small.py \
-    --data_root <dataset_root> \
-    --num_classes <number_of_classes> \
-    --train_path <train_path> \
-    --val_path <val_path> \
+python train_dinov2_arcface_small.py \    
+    --data_root <files/v1.0.5>   --output_dir <output mdoel dir> \
+    -lr 0.0002 --epoch 110 -b 48 --num_classes <class_num + 1> \
     [OPTIONS]
 ```
 
