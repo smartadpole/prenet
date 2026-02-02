@@ -39,21 +39,26 @@ pip install -r requirements.txt
 
 ### Data preparation
 
-1. Download the food datasets. The file structure should look like:
-```
-dataset
-├── class_001
-|      ├── 1.jpg
-|      ├── 2.jpg
-|      └── ...
-├── class_002
-|      ├── 1.jpg
-|      ├── 2.jpg
-|      └── ...
-│── ...
-```
 
-2. Prepare the training and testing list files. You have two options:
+1. For dataset production using the provided scripts (including `gen_all_dataset.sh`) and a detailed description of generated files, see:
+    - [docs/user/dataset_preparation.md](docs/user/dataset_preparation.md)
+
+
+2. Download the food datasets. The file structure should look like:
+    ```
+    dataset
+    ├── class_001
+    |      ├── 1.jpg
+    |      ├── 2.jpg
+    |      └── ...
+    ├── class_002
+    |      ├── 1.jpg
+    |      ├── 2.jpg
+    |      └── ...
+    │── ...
+    ```
+
+3. Prepare the training and testing list files. You have two options:
 
    **Option A:** Place `train.txt` and `val.txt` in the dataset root directory. The data loader will automatically discover them.
    
